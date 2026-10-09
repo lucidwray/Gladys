@@ -3,8 +3,16 @@ import { Text } from 'preact-i18n';
 import cx from 'classnames';
 
 import { DeviceFeatureCategoriesIcon } from '../../../../utils/consts';
-import { DEVICE_FEATURE_CATEGORIES } from '../../../../../../server/utils/constants';
+import { DEVICE_FEATURE_CATEGORIES, DEVICE_FEATURE_UNITS } from '../../../../../../server/utils/constants';
 import { decimalsOf } from '../../../../../../server/utils/units';
+import {
+  convertTemperature,
+  getDisplayStep,
+  isTemperatureUnit,
+  roundDisplayValue,
+  stepSetpoint,
+  toFeatureSetpoint
+} from '../../../../utils/hawrayTemperature';
 
 import style from './style.css';
 
@@ -38,11 +46,42 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
   const SETPOINT_STEP = props.deviceFeature.step || SETPOINT_STEP_BY_CATEGORY[props.deviceFeature.category] || 0.5;
   const DEFAULT_VALUE_IN_CASE_EMPTY = DEFAULT_VALUE_BY_CATEGORY[props.deviceFeature.category] || 0;
 
+  // A temperature setpoint is shown and stepped in the user's unit when it differs from the feature's own
+  // unit. The value sent back is always in the feature's unit, so the device never sees a converted value
+  // labelled with the wrong unit.
+  const featureUnit = props.deviceFeature.unit;
+  const userUnit = props.user && props.user.temperature_unit_preference;
+  const isConverted = isTemperatureUnit(featureUnit) && isTemperatureUnit(userUnit) && userUnit !== featureUnit;
+  const displayUnit = isConverted ? userUnit : featureUnit;
+  const setpoint = {
+    featureUnit,
+    displayUnit: userUnit,
+    featureStep: props.deviceFeature.step,
+    min: props.deviceFeature.min,
+    max: props.deviceFeature.max
+  };
+  // The step the buttons move by, in the displayed unit: a whole degree Fahrenheit, otherwise the step above
+  const DEFAULT_DISPLAY_STEP = userUnit === DEVICE_FEATURE_UNITS.FAHRENHEIT ? 1 : SETPOINT_STEP;
+  const displayStep = isConverted ? getDisplayStep(setpoint, DEFAULT_DISPLAY_STEP) : SETPOINT_STEP;
+
+  const toDisplayBound = bound =>
+    isConverted && Number.isFinite(bound) ? convertTemperature(bound, featureUnit, userUnit) : bound;
+
+  const displayValue =
+    isConverted && !isNullOrUndefined(props.deviceFeature.last_value)
+      ? roundDisplayValue(convertTemperature(props.deviceFeature.last_value, featureUnit, userUnit))
+      : props.deviceFeature.last_value;
+
   function updateValue(value) {
     props.updateValueWithDebounce(props.deviceFeature, value);
   }
 
   function updateValueEvent(e) {
+    const typed = Number(e.target.value);
+    if (isConverted && e.target.value !== '' && Number.isFinite(typed)) {
+      updateValue(toFeatureSetpoint(typed, setpoint));
+      return;
+    }
     updateValue(e.target.value);
   }
 
@@ -50,6 +89,10 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
     const prevValue = isNullOrUndefined(props.deviceFeature.last_value)
       ? DEFAULT_VALUE_IN_CASE_EMPTY
       : props.deviceFeature.last_value;
+    if (isConverted) {
+      updateValue(stepSetpoint(prevValue, 1, setpoint, DEFAULT_DISPLAY_STEP));
+      return;
+    }
     updateValue(addToValue(prevValue, SETPOINT_STEP));
   }
 
@@ -57,6 +100,10 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
     const prevValue = isNullOrUndefined(props.deviceFeature.last_value)
       ? DEFAULT_VALUE_IN_CASE_EMPTY
       : props.deviceFeature.last_value;
+    if (isConverted) {
+      updateValue(stepSetpoint(prevValue, -1, setpoint, DEFAULT_DISPLAY_STEP));
+      return;
+    }
     updateValue(addToValue(prevValue, -SETPOINT_STEP));
   }
 
@@ -88,13 +135,20 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
             </div>
             <input
               type="number"
-              value={props.deviceFeature.last_value}
+              value={displayValue}
               class={cx('form-control text-center', style.removeNumberArrow, style.setpointValue)}
               onChange={updateValueEvent}
-              step={SETPOINT_STEP}
-              min={props.deviceFeature.min}
-              max={props.deviceFeature.max}
+              step={isConverted ? displayStep : SETPOINT_STEP}
+              min={toDisplayBound(props.deviceFeature.min)}
+              max={toDisplayBound(props.deviceFeature.max)}
             />
+            {isTemperatureUnit(displayUnit) && (
+              <div class="input-group-append">
+                <span class="input-group-text">
+                  <Text id={`deviceFeatureUnitShort.${displayUnit}`} />
+                </span>
+              </div>
+            )}
             <div class="input-group-append">
               <button class="btn btn-outline-secondary" type="button" onClick={add}>
                 <Text id="dashboard.boxes.devicesInRoom.addButton" />

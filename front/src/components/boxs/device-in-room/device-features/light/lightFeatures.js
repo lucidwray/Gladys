@@ -208,7 +208,10 @@ export const kelvinToTemperatureValue = (feature, kelvin) => {
   }
   const min = Number.isFinite(feature.min) ? feature.min : 0;
   const max = Number.isFinite(feature.max) ? feature.max : 100;
-  const ratio = (COLDEST_DISPLAYED_KELVIN - kelvin) / (COLDEST_DISPLAYED_KELVIN - WARMEST_DISPLAYED_KELVIN);
+  // The ratio scale covers the usual white range only: a kelvin beyond it (a 1500 K source, say) is
+  // held at the end of the scale, so a feature with no declared bounds never receives more than 100.
+  const rawRatio = (COLDEST_DISPLAYED_KELVIN - kelvin) / (COLDEST_DISPLAYED_KELVIN - WARMEST_DISPLAYED_KELVIN);
+  const ratio = Math.min(1, Math.max(0, rawRatio));
   return min + ratio * (max - min);
 };
 

@@ -47,15 +47,12 @@ const RELATIVE_KEYS = new Set([
   getKey(DEVICE_FEATURE_CATEGORIES.SHUTTER, DEVICE_FEATURE_TYPES.SHUTTER.POSITION),
   getKey(DEVICE_FEATURE_CATEGORIES.CURTAIN, DEVICE_FEATURE_TYPES.CURTAIN.POSITION),
   getKey(DEVICE_FEATURE_CATEGORIES.FAN, DEVICE_FEATURE_TYPES.FAN.PERCENT),
-  getKey(DEVICE_FEATURE_CATEGORIES.TELEVISION, DEVICE_FEATURE_TYPES.TELEVISION.VOLUME),
-  getKey(
-    DEVICE_FEATURE_CATEGORIES.ELECTRICAL_VEHICLE_CHARGE,
-    DEVICE_FEATURE_TYPES.ELECTRICAL_VEHICLE_CHARGE.TARGET_CHARGE_LIMIT
-  )
+  getKey(DEVICE_FEATURE_CATEGORIES.TELEVISION, DEVICE_FEATURE_TYPES.TELEVISION.VOLUME)
 ]);
 
-// A setpoint or a current is a physical quantity: 20 degrees on a thermostat means 20 degrees whatever
-// its bounds, so these are never scaled between ranges.
+// A setpoint, a current or a charge target is a physical quantity: 20 degrees on a thermostat means 20
+// degrees whatever its bounds, and a charge limit of 80 % is the car's own target, not a share of the
+// device's range. These are never scaled between ranges.
 const PHYSICAL_KEYS = new Set([
   getKey(DEVICE_FEATURE_CATEGORIES.THERMOSTAT, DEVICE_FEATURE_TYPES.THERMOSTAT.TARGET_TEMPERATURE),
   getKey(DEVICE_FEATURE_CATEGORIES.AIR_CONDITIONING, DEVICE_FEATURE_TYPES.AIR_CONDITIONING.TARGET_TEMPERATURE),
@@ -65,6 +62,10 @@ const PHYSICAL_KEYS = new Set([
     DEVICE_FEATURE_TYPES.ELECTRICAL_VEHICLE_CLIMATE.TARGET_TEMPERATURE
   ),
   getKey(DEVICE_FEATURE_CATEGORIES.SWITCH, DEVICE_FEATURE_TYPES.SWITCH.TARGET_CURRENT),
+  getKey(
+    DEVICE_FEATURE_CATEGORIES.ELECTRICAL_VEHICLE_CHARGE,
+    DEVICE_FEATURE_TYPES.ELECTRICAL_VEHICLE_CHARGE.TARGET_CHARGE_LIMIT
+  ),
   getKey(
     DEVICE_FEATURE_CATEGORIES.ELECTRICAL_VEHICLE_CHARGE,
     DEVICE_FEATURE_TYPES.ELECTRICAL_VEHICLE_CHARGE.TARGET_CURRENT
@@ -193,12 +194,27 @@ const getCommonSupportedOptions = members => {
   return common.length > 0 ? common : firstList;
 };
 
+// A physical group spans every member's bounds, so each member's full range can be reached from the
+// group slider (a member's own bounds still clamp what it actually receives). A side is left open when
+// any member declares no bound on it.
+const getUnionOfBounds = members => {
+  const mins = members.map(member => member.min);
+  const maxs = members.map(member => member.max);
+  return {
+    min: mins.every(Number.isFinite) ? Math.min(...mins) : undefined,
+    max: maxs.every(Number.isFinite) ? Math.max(...maxs) : undefined
+  };
+};
+
 // Builds the one virtual feature standing for a group of same-type members. The category, type,
-// bounds, step and unit come from the first member; the value is the aggregate.
+// step and unit come from the first member; the bounds are the first member's, except for physical
+// groups (see getUnionOfBounds). The value is the aggregate.
 const aggregateGroup = members => {
   const [first] = members;
   const key = getFeatureKey(first);
   const supportedOptions = getCommonSupportedOptions(members);
+  const kind = getAggregateKind(first);
+  const bounds = kind === AGGREGATE_KIND.PHYSICAL ? getUnionOfBounds(members) : { min: first.min, max: first.max };
   const feature = {
     id: `${GROUP_FEATURE_PREFIX}:${key}`,
     selector: `${GROUP_FEATURE_PREFIX}:${key}`,
@@ -206,13 +222,12 @@ const aggregateGroup = members => {
     category: first.category,
     type: first.type,
     unit: first.unit,
-    min: first.min,
-    max: first.max,
+    min: bounds.min,
+    max: bounds.max,
     step: first.step,
     read_only: false,
     ...(supportedOptions ? { supported_options: supportedOptions } : {})
   };
-  const kind = getAggregateKind(first);
 
   if (kind === AGGREGATE_KIND.BINARY) {
     const known = members.filter(member => isSet(member.last_value));

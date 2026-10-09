@@ -8,8 +8,15 @@ REF="${1:-origin/hawray}"
 IMAGE="${IMAGE:-gladys-hawray}"
 
 cd "$(dirname "$0")/.."
-git fetch --quiet origin
-git checkout --quiet --detach "$REF"
+
+# The checkout can rewrite this very file: re-exec the checked-out copy so bash
+# never keeps reading a script that changed under it.
+if [ -z "${HAWRAY_BUILD_CHECKED_OUT:-}" ]; then
+  git fetch --quiet origin
+  git checkout --quiet --detach "$REF"
+  HAWRAY_BUILD_CHECKED_OUT=1 exec hawray/build.sh "$@"
+fi
+
 SHA="$(git rev-parse --short HEAD)"
 echo "Building $IMAGE from $REF ($SHA)"
 

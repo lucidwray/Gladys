@@ -23,7 +23,8 @@ echo "Building $IMAGE from $REF ($SHA)"
 # Front: same steps as .github/workflows/docker-dev-build.yml (npm ci + npm run build),
 # in a throwaway node:24 container so the server needs no Node install. The whole
 # repo is mounted: front/vite.config.mjs reads the version from the root package.json.
-docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp \
+# vite needs more than the default ~2 GB V8 heap for this bundle.
+docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e NODE_OPTIONS=--max-old-space-size=4096 \
   -v "$PWD:/src" -w /src/front node:24 sh -c 'npm ci && npm run build'
 
 # docker/Dockerfile.buildx expects the built front in ./static

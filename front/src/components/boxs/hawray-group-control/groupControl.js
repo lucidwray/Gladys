@@ -7,6 +7,7 @@ import {
   kelvinToTemperatureValue,
   temperatureValueToKelvin
 } from '../device-in-room/device-features/light/lightFeatures';
+import { convertTemperature } from '../../../utils/hawrayTemperature';
 
 // Pure logic of the group control widget: grouping the features of several devices by type, reading
 // one aggregate value from them, and spreading a value written on the aggregate back to every member.
@@ -194,12 +195,18 @@ const getCommonSupportedOptions = members => {
   return common.length > 0 ? common : firstList;
 };
 
+// A temperature target can be held by members in different units (a Celsius thermostat next to a
+// Fahrenheit one): the group reads and writes in the first member's unit, so a member's value or bound
+// is moved onto it. Same-unit members, and values that are not numbers, are returned unchanged.
+const toGroupUnit = (member, value, groupUnit) =>
+  Number.isFinite(value) ? convertTemperature(value, member.unit, groupUnit) : value;
+
 // A physical group spans every member's bounds, so each member's full range can be reached from the
 // group slider (a member's own bounds still clamp what it actually receives). A side is left open when
 // any member declares no bound on it.
-const getUnionOfBounds = members => {
-  const mins = members.map(member => member.min);
-  const maxs = members.map(member => member.max);
+const getUnionOfBounds = (members, groupUnit) => {
+  const mins = members.map(member => toGroupUnit(member, member.min, groupUnit));
+  const maxs = members.map(member => toGroupUnit(member, member.max, groupUnit));
   return {
     min: mins.every(Number.isFinite) ? Math.min(...mins) : undefined,
     max: maxs.every(Number.isFinite) ? Math.max(...maxs) : undefined
@@ -214,7 +221,8 @@ const aggregateGroup = members => {
   const key = getFeatureKey(first);
   const supportedOptions = getCommonSupportedOptions(members);
   const kind = getAggregateKind(first);
-  const bounds = kind === AGGREGATE_KIND.PHYSICAL ? getUnionOfBounds(members) : { min: first.min, max: first.max };
+  const bounds =
+    kind === AGGREGATE_KIND.PHYSICAL ? getUnionOfBounds(members, first.unit) : { min: first.min, max: first.max };
   const feature = {
     id: `${GROUP_FEATURE_PREFIX}:${key}`,
     selector: `${GROUP_FEATURE_PREFIX}:${key}`,
@@ -260,10 +268,11 @@ const aggregateGroup = members => {
     if (known.length === 0) {
       return { ...feature, last_value: null, last_value_changed: null };
     }
-    const total = known.reduce((sum, member) => sum + member.last_value, 0);
+    const total = known.reduce((sum, member) => sum + toGroupUnit(member, member.last_value, first.unit), 0);
     return {
       ...feature,
-      last_value: clampToBounds(roundToStep(total / known.length, first.step), first),
+      // Clamped to the union of the members' bounds, the same range the group slider offers
+      last_value: clampToBounds(roundToStep(total / known.length, first.step), feature),
       last_value_changed: getLastChanged(known).last_value_changed
     };
   }
@@ -320,7 +329,8 @@ const getMemberValue = (member, groupFeature, kind, value) => {
     const kelvin = temperatureValueToKelvin(groupFeature, value);
     return clampToBounds(roundToStep(kelvinToTemperatureValue(member, kelvin), member.step), member);
   }
-  return clampToBounds(roundToStep(value, member.step), member);
+  // A physical value written on the group is in the group's unit: moved onto the member's own unit first
+  return clampToBounds(roundToStep(convertTemperature(value, groupFeature.unit, member.unit), member.step), member);
 };
 
 /**

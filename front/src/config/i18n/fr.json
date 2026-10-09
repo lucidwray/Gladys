@@ -7149,5 +7149,82 @@
     "closed": "Fermé",
     "on": "Allumé",
     "off": "Éteint"
+  },
+  "hawrayControls": {
+    "nav": "Contrôles",
+    "list": {
+      "title": "Contrôles",
+      "deviceCount": {
+        "one": "{{count}} appareil",
+        "other": "{{count}} appareils"
+      },
+      "error": "Les appareils n'ont pas pu être chargés.",
+      "retry": "Réessayer",
+      "empty": "Aucun appareil pour l'instant. Ils apparaissent ici dès qu'une intégration les ajoute.",
+      "noMatch": "Aucun appareil ne correspond à ces filtres.",
+      "noRoom": "Sans pièce",
+      "allRooms": "Toutes les pièces",
+      "searchPlaceholder": "Rechercher un appareil",
+      "lastSeen": "Vu",
+      "noState": "Aucun état",
+      "toggle": "Allumer ou éteindre {{name}}"
+    },
+    "detail": {
+      "back": "Tous les contrôles",
+      "notFound": "Cet appareil n'existe pas ou a été supprimé.",
+      "error": "L'appareil n'a pas pu être chargé.",
+      "retry": "Réessayer",
+      "integration": "Intégration :",
+      "noRoom": "Sans pièce",
+      "controls": "Contrôles",
+      "features": {
+        "title": "Fonctionnalités",
+        "empty": "Cet appareil n'a aucune fonctionnalité.",
+        "name": "Nom",
+        "type": "Type",
+        "unit": "Unité",
+        "range": "Plage",
+        "access": "Accès",
+        "lastValue": "Dernière valeur",
+        "lastChanged": "Dernier changement",
+        "selector": "Sélecteur",
+        "readOnly": "Lecture seule",
+        "writable": "Modifiable"
+      },
+      "history": {
+        "title": "Historique",
+        "empty": "Aucune fonctionnalité numérique à tracer sur cet appareil."
+      },
+      "ranges": {
+        "24h": "24 h",
+        "7d": "7 jours",
+        "30d": "30 jours"
+      },
+      "log": {
+        "title": "Changements récents",
+        "empty": "Aucun changement d'état sur cette période.",
+        "error": "L'historique n'a pas pu être chargé.",
+        "time": "Heure",
+        "feature": "Fonctionnalité",
+        "value": "Valeur",
+        "showMore": "Afficher plus",
+        "loading": "Chargement…"
+      },
+      "details": {
+        "title": "Détails de l'appareil",
+        "model": "Modèle",
+        "externalId": "Identifiant externe",
+        "selector": "Sélecteur",
+        "createdAt": "Créé le",
+        "updatedAt": "Mis à jour le",
+        "shouldPoll": "Interrogé",
+        "pollFrequency": "Fréquence d'interrogation",
+        "yes": "Oui",
+        "no": "Non",
+        "params": "Paramètres",
+        "noParams": "Aucun paramètre.",
+        "masked": "Masqué : ce paramètre contient un secret"
+      }
+    }
   }
 }

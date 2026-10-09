@@ -39,6 +39,7 @@ const NON_DASHBOARD_SECTIONS = [
   'history',
   'chat',
   'devices',
+  'controls',
   'integration',
   'calendar',
   'maps',
@@ -79,6 +80,12 @@ const NAV_ITEMS = [
     icon: 'toggle-right',
     labelKey: 'header.devices',
     isActive: url => url === '/dashboard/devices'
+  },
+  {
+    href: '/dashboard/controls',
+    icon: 'sliders',
+    labelKey: 'hawrayControls.nav',
+    isActive: url => url.startsWith('/dashboard/controls')
   },
   {
     href: '/dashboard/integration',

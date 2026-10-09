@@ -7149,5 +7149,82 @@
     "closed": "Cerrado",
     "on": "Encendido",
     "off": "Apagado"
+  },
+  "hawrayControls": {
+    "nav": "Controles",
+    "list": {
+      "title": "Controles",
+      "deviceCount": {
+        "one": "{{count}} dispositivo",
+        "other": "{{count}} dispositivos"
+      },
+      "error": "No se pudieron cargar los dispositivos.",
+      "retry": "Reintentar",
+      "empty": "Todavía no hay dispositivos. Aparecen aquí en cuanto una integración los añade.",
+      "noMatch": "Ningún dispositivo coincide con estos filtros.",
+      "noRoom": "Sin habitación",
+      "allRooms": "Todas las habitaciones",
+      "searchPlaceholder": "Buscar un dispositivo",
+      "lastSeen": "Visto",
+      "noState": "Sin estado",
+      "toggle": "Encender o apagar {{name}}"
+    },
+    "detail": {
+      "back": "Todos los controles",
+      "notFound": "Este dispositivo no existe o fue eliminado.",
+      "error": "No se pudo cargar el dispositivo.",
+      "retry": "Reintentar",
+      "integration": "Integración:",
+      "noRoom": "Sin habitación",
+      "controls": "Controles",
+      "features": {
+        "title": "Funcionalidades",
+        "empty": "Este dispositivo no tiene funcionalidades.",
+        "name": "Nombre",
+        "type": "Tipo",
+        "unit": "Unidad",
+        "range": "Rango",
+        "access": "Acceso",
+        "lastValue": "Último valor",
+        "lastChanged": "Último cambio",
+        "selector": "Selector",
+        "readOnly": "Solo lectura",
+        "writable": "Editable"
+      },
+      "history": {
+        "title": "Historial",
+        "empty": "Ninguna funcionalidad numérica para graficar en este dispositivo."
+      },
+      "ranges": {
+        "24h": "24 h",
+        "7d": "7 días",
+        "30d": "30 días"
+      },
+      "log": {
+        "title": "Cambios recientes",
+        "empty": "Ningún cambio de estado en este periodo.",
+        "error": "No se pudo cargar el historial.",
+        "time": "Hora",
+        "feature": "Funcionalidad",
+        "value": "Valor",
+        "showMore": "Mostrar más",
+        "loading": "Cargando…"
+      },
+      "details": {
+        "title": "Detalles del dispositivo",
+        "model": "Modelo",
+        "externalId": "ID externo",
+        "selector": "Selector",
+        "createdAt": "Creado",
+        "updatedAt": "Actualizado",
+        "shouldPoll": "Sondeado",
+        "pollFrequency": "Frecuencia de sondeo",
+        "yes": "Sí",
+        "no": "No",
+        "params": "Parámetros",
+        "noParams": "Ningún parámetro.",
+        "masked": "Oculto: este parámetro contiene un secreto"
+      }
+    }
   }
 }

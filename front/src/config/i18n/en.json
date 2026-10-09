@@ -7149,5 +7149,82 @@
     "closed": "Closed",
     "on": "On",
     "off": "Off"
+  },
+  "hawrayControls": {
+    "nav": "Controls",
+    "list": {
+      "title": "Controls",
+      "deviceCount": {
+        "one": "{{count}} device",
+        "other": "{{count}} devices"
+      },
+      "error": "The devices could not be loaded.",
+      "retry": "Try again",
+      "empty": "No device yet. Devices appear here as soon as an integration adds them.",
+      "noMatch": "No device matches these filters.",
+      "noRoom": "No room",
+      "allRooms": "All rooms",
+      "searchPlaceholder": "Search a device",
+      "lastSeen": "Last seen",
+      "noState": "No state",
+      "toggle": "Turn {{name}} on or off"
+    },
+    "detail": {
+      "back": "All controls",
+      "notFound": "This device does not exist or was deleted.",
+      "error": "The device could not be loaded.",
+      "retry": "Try again",
+      "integration": "Integration:",
+      "noRoom": "No room",
+      "controls": "Controls",
+      "features": {
+        "title": "Features",
+        "empty": "This device has no feature.",
+        "name": "Name",
+        "type": "Type",
+        "unit": "Unit",
+        "range": "Range",
+        "access": "Access",
+        "lastValue": "Last value",
+        "lastChanged": "Last changed",
+        "selector": "Selector",
+        "readOnly": "Read-only",
+        "writable": "Writable"
+      },
+      "history": {
+        "title": "History",
+        "empty": "No numeric feature to chart on this device."
+      },
+      "ranges": {
+        "24h": "24 h",
+        "7d": "7 days",
+        "30d": "30 days"
+      },
+      "log": {
+        "title": "Recent changes",
+        "empty": "No state change in this period.",
+        "error": "The history could not be loaded.",
+        "time": "Time",
+        "feature": "Feature",
+        "value": "Value",
+        "showMore": "Show more",
+        "loading": "Loading…"
+      },
+      "details": {
+        "title": "Device details",
+        "model": "Model",
+        "externalId": "External ID",
+        "selector": "Selector",
+        "createdAt": "Created",
+        "updatedAt": "Updated",
+        "shouldPoll": "Polled",
+        "pollFrequency": "Poll frequency",
+        "yes": "Yes",
+        "no": "No",
+        "params": "Parameters",
+        "noParams": "No parameter.",
+        "masked": "Hidden: this parameter holds a secret"
+      }
+    }
   }
 }

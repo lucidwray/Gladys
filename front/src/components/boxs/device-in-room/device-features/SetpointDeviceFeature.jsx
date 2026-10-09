@@ -5,7 +5,14 @@ import cx from 'classnames';
 import { DeviceFeatureCategoriesIcon } from '../../../../utils/consts';
 import { DEVICE_FEATURE_CATEGORIES, DEVICE_FEATURE_UNITS } from '../../../../../../server/utils/constants';
 import { decimalsOf } from '../../../../../../server/utils/units';
-import { convertTemperature, isTemperatureUnit, roundToStep } from '../../../../utils/hawrayTemperature';
+import {
+  convertTemperature,
+  getDisplayStep,
+  isTemperatureUnit,
+  roundDisplayValue,
+  stepSetpoint,
+  toFeatureSetpoint
+} from '../../../../utils/hawrayTemperature';
 
 import style from './style.css';
 
@@ -46,26 +53,19 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
   const userUnit = props.user && props.user.temperature_unit_preference;
   const isConverted = isTemperatureUnit(featureUnit) && isTemperatureUnit(userUnit) && userUnit !== featureUnit;
   const displayUnit = isConverted ? userUnit : featureUnit;
+  const setpoint = {
+    featureUnit,
+    displayUnit: userUnit,
+    featureStep: props.deviceFeature.step,
+    min: props.deviceFeature.min,
+    max: props.deviceFeature.max
+  };
   // The step the buttons move by, in the displayed unit: a whole degree Fahrenheit, otherwise the step above
-  const displayStep = isConverted && userUnit === DEVICE_FEATURE_UNITS.FAHRENHEIT ? 1 : SETPOINT_STEP;
-  // Values converted back to the feature's unit land on its own step, or on the default of its unit
-  const featureRoundingStep = props.deviceFeature.step || (featureUnit === DEVICE_FEATURE_UNITS.CELSIUS ? 0.5 : 1);
+  const DEFAULT_DISPLAY_STEP = userUnit === DEVICE_FEATURE_UNITS.FAHRENHEIT ? 1 : SETPOINT_STEP;
+  const displayStep = isConverted ? getDisplayStep(setpoint, DEFAULT_DISPLAY_STEP) : SETPOINT_STEP;
 
-  const roundDisplayValue = value => Math.round(value * 10) / 10;
   const toDisplayBound = bound =>
     isConverted && Number.isFinite(bound) ? convertTemperature(bound, featureUnit, userUnit) : bound;
-
-  // Converts a value typed or stepped in the displayed unit back to the feature's unit, on its step, within its bounds
-  const toFeatureValue = value => {
-    let result = roundToStep(convertTemperature(value, userUnit, featureUnit), featureRoundingStep);
-    if (Number.isFinite(props.deviceFeature.min)) {
-      result = Math.max(props.deviceFeature.min, result);
-    }
-    if (Number.isFinite(props.deviceFeature.max)) {
-      result = Math.min(props.deviceFeature.max, result);
-    }
-    return result;
-  };
 
   const displayValue =
     isConverted && !isNullOrUndefined(props.deviceFeature.last_value)
@@ -79,7 +79,7 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
   function updateValueEvent(e) {
     const typed = Number(e.target.value);
     if (isConverted && e.target.value !== '' && Number.isFinite(typed)) {
-      updateValue(toFeatureValue(typed));
+      updateValue(toFeatureSetpoint(typed, setpoint));
       return;
     }
     updateValue(e.target.value);
@@ -90,8 +90,7 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
       ? DEFAULT_VALUE_IN_CASE_EMPTY
       : props.deviceFeature.last_value;
     if (isConverted) {
-      const prevDisplayValue = roundDisplayValue(convertTemperature(prevValue, featureUnit, userUnit));
-      updateValue(toFeatureValue(addToValue(prevDisplayValue, displayStep)));
+      updateValue(stepSetpoint(prevValue, 1, setpoint, DEFAULT_DISPLAY_STEP));
       return;
     }
     updateValue(addToValue(prevValue, SETPOINT_STEP));
@@ -102,8 +101,7 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
       ? DEFAULT_VALUE_IN_CASE_EMPTY
       : props.deviceFeature.last_value;
     if (isConverted) {
-      const prevDisplayValue = roundDisplayValue(convertTemperature(prevValue, featureUnit, userUnit));
-      updateValue(toFeatureValue(addToValue(prevDisplayValue, -displayStep)));
+      updateValue(stepSetpoint(prevValue, -1, setpoint, DEFAULT_DISPLAY_STEP));
       return;
     }
     updateValue(addToValue(prevValue, -SETPOINT_STEP));
@@ -145,9 +143,11 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
               max={toDisplayBound(props.deviceFeature.max)}
             />
             {isTemperatureUnit(displayUnit) && (
-              <span class="input-group-text">
-                <Text id={`deviceFeatureUnitShort.${displayUnit}`} />
-              </span>
+              <div class="input-group-append">
+                <span class="input-group-text">
+                  <Text id={`deviceFeatureUnitShort.${displayUnit}`} />
+                </span>
+              </div>
             )}
             <div class="input-group-append">
               <button class="btn btn-outline-secondary" type="button" onClick={add}>

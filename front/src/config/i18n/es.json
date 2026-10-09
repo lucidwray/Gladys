@@ -1,4 +1,21 @@
 {
+  "hawrayGroupControl": {
+    "defaultName": "Grupo",
+    "editNameLabel": "Nombre",
+    "editNamePlaceholder": "Grupo",
+    "editFeaturesLabel": "Dispositivos del grupo",
+    "editHint": "Las funciones del mismo tipo se controlan juntas: un solo control actúa sobre todas.",
+    "addFeatureLabel": "Añadir una función al grupo",
+    "removeFeature": "Quitar del grupo",
+    "noFeatures": "Todavía no hay ninguna función seleccionada.",
+    "deviceCountSingular": "1 dispositivo",
+    "deviceCountPlural": "{{count}} dispositivos",
+    "showDevices": "Mostrar dispositivos",
+    "hideDevices": "Ocultar dispositivos",
+    "writeFailed": "{{failed}} de {{total}} dispositivos no se pudieron actualizar.",
+    "loadFailed": "No se pudieron cargar los dispositivos de este grupo.",
+    "allFeaturesSuffix": "todas las funciones"
+  },
   "global": {
     "logoAlt": "Logo de Gladys",
     "needHelpText": "¿Necesita ayuda? Únase a nosotros en <a href=\"https://community.gladysassistant.com/\" target=\"_blank\" rel=\"noopener noreferrer\"> Gladys Community</a>.",
@@ -406,7 +423,8 @@
       "house-view": "Vista de la casa",
       "external-widget": "Widget de integración",
       "thermostat": "Termostato",
-      "energy-price": "Precio de la electricidad"
+      "energy-price": "Precio de la electricidad",
+      "hawray-group-control": "Control de grupo"
     },
     "boxes": {
       "column": "Columna {{index}}",

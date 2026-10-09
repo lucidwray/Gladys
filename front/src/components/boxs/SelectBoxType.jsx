@@ -40,7 +40,8 @@ const BOX_TYPE_ICONS = {
   sun: 'sun',
   chips: 'more-horizontal',
   'house-view': 'home',
-  actions: 'zap'
+  actions: 'zap',
+  'hawray-group-control': 'layers'
 };
 
 import BaseEditBox from './baseEditBox';

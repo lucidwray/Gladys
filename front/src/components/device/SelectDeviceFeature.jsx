@@ -29,6 +29,7 @@ class SelectDeviceFeature extends Component {
 
       const deviceDictionnary = {};
       const deviceFeaturesDictionnary = {};
+      const deviceAllFeaturesDictionnary = {};
 
       const sortByLabel = (a, b) => {
         if (a.label < b.label) {
@@ -66,6 +67,19 @@ class SelectDeviceFeature extends Component {
               searchText: normalizeSearchString(`${roomName} ${label}`)
             });
           });
+          // Only when the caller asks for it (EditDevices): one extra option adds every feature of the device
+          if (this.props.withDeviceAllFeaturesOption && device.features.length > 0) {
+            const allFeaturesValue = `all-features:${device.selector}`;
+            const allFeaturesLabel = `${device.name} — ${this.props.intl.dictionary.hawrayGroupControl.allFeaturesSuffix}`;
+            deviceAllFeaturesDictionnary[allFeaturesValue] = device;
+            targetFeatures.push({
+              value: allFeaturesValue,
+              label: allFeaturesLabel,
+              searchText: normalizeSearchString(`${roomName} ${allFeaturesLabel}`),
+              // the option is hidden once every one of these features is already picked
+              featureSelectors: device.features.map(feature => feature.selector)
+            });
+          }
         });
       };
 
@@ -99,7 +113,12 @@ class SelectDeviceFeature extends Component {
         });
       }
 
-      await this.setState({ deviceOptions, deviceFeaturesDictionnary, deviceDictionnary });
+      await this.setState({
+        deviceOptions,
+        deviceFeaturesDictionnary,
+        deviceDictionnary,
+        deviceAllFeaturesDictionnary
+      });
       await this.refreshSelectedOptions(this.props);
       return deviceOptions;
     } catch (e) {
@@ -118,6 +137,11 @@ class SelectDeviceFeature extends Component {
       return;
     }
     if (selectedOption && selectedOption.value) {
+      const allFeaturesDevice = (this.state.deviceAllFeaturesDictionnary || {})[selectedOption.value];
+      if (allFeaturesDevice) {
+        this.props.onDeviceAllFeaturesChange(allFeaturesDevice);
+        return;
+      }
       this.props.onDeviceFeatureChange(
         deviceFeaturesDictionnary[selectedOption.value],
         deviceDictionnary[selectedOption.value]
@@ -201,9 +225,10 @@ class SelectDeviceFeature extends Component {
     // This is evaluated at render time (unlike filterFeature) because the list
     // changes after every pick.
     if (excludedDeviceFeatures.length > 0) {
-      displayedOptions = filterOptionGroups(
-        displayedOptions,
-        option => excludedDeviceFeatures.indexOf(option.value) === -1
+      displayedOptions = filterOptionGroups(displayedOptions, option =>
+        option.featureSelectors
+          ? option.featureSelectors.some(selector => excludedDeviceFeatures.indexOf(selector) === -1)
+          : excludedDeviceFeatures.indexOf(option.value) === -1
       );
     }
     if (!this.props.isMulti || selectedOptions.length === 0) {

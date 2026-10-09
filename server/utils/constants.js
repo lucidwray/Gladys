@@ -2264,6 +2264,8 @@ const DASHBOARD_BOX_TYPE = {
   // one core box type serving every widget declared by an external integration
   EXTERNAL_WIDGET: 'external-widget',
   THERMOSTAT: 'thermostat',
+  // fork-only widget (hawray): one control driving the same feature type on several devices at once
+  HAWRAY_GROUP_CONTROL: 'hawray-group-control',
 };
 
 const DASHBOARD_WIDTH = {

@@ -27,6 +27,7 @@ import EditActionsBox from '../../../components/boxs/actions/EditActionsBox';
 import EditHouseViewBox from '../../../components/boxs/house-view/EditHouseViewBox';
 import EditExternalWidgetBox from '../../../components/boxs/external-widget/EditExternalWidgetBox';
 import EditThermostatBox from '../../../components/boxs/thermostat/EditThermostatBox';
+import EditGroupControlBox from '../../../components/boxs/hawray-group-control/EditGroupControlBox';
 
 const Box = ({ children, ...props }) => {
   switch (props.box.type) {
@@ -82,6 +83,8 @@ const Box = ({ children, ...props }) => {
       return <EditExternalWidgetBox {...props} />;
     case 'thermostat':
       return <EditThermostatBox {...props} />;
+    case 'hawray-group-control':
+      return <EditGroupControlBox {...props} />;
     default:
       return <SelectBoxType {...props} />;
   }

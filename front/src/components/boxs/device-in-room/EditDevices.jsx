@@ -28,6 +28,23 @@ class EditDevices extends Component {
     this.refreshDeviceFeaturesNames();
   };
 
+  // "<Device> — all features": appends every feature of the device not already picked, in feature order
+  addDeviceAllFeatures = async device => {
+    const currentOptions = this.state.selectedDeviceFeaturesOptions || [];
+    const pickedSelectors = currentOptions.map(option => option.value);
+    const newOptions = device.features
+      .filter(feature => !pickedSelectors.includes(feature.selector))
+      .map(feature => ({
+        value: feature.selector,
+        label: getDeviceFeatureName(this.props.intl.dictionary, device, feature)
+      }));
+    if (newOptions.length === 0) {
+      return;
+    }
+    await this.setState({ selectedDeviceFeaturesOptions: [...currentOptions, ...newOptions] });
+    this.refreshDeviceFeaturesNames();
+  };
+
   updateName = e => {
     this.props.updateBoxConfig(this.props.x, this.props.y, {
       name: e.target.value
@@ -215,6 +232,8 @@ class EditDevices extends Component {
               <SelectDeviceFeature
                 excludedDeviceFeatures={selectedDeviceFeatures}
                 onDeviceFeatureChange={this.addDeviceFeature}
+                withDeviceAllFeaturesOption
+                onDeviceAllFeaturesChange={this.addDeviceAllFeatures}
               />
             </div>
           </div>

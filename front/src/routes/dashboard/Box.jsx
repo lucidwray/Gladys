@@ -25,6 +25,7 @@ import HouseViewBox from '../../components/boxs/house-view/HouseViewBox';
 import ExternalWidgetBox from '../../components/boxs/external-widget/ExternalWidgetBox';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import ThermostatBox from '../../components/boxs/thermostat/ThermostatBox';
+import GroupControlBox from '../../components/boxs/hawray-group-control/GroupControlBox';
 
 const BoxContent = ({ children, ...props }) => {
   switch (props.box.type) {
@@ -80,6 +81,8 @@ const BoxContent = ({ children, ...props }) => {
       return <ExternalWidgetBox {...props} />;
     case 'thermostat':
       return <ThermostatBox {...props} />;
+    case 'hawray-group-control':
+      return <GroupControlBox {...props} />;
   }
 };
 

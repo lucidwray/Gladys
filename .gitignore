@@ -30,3 +30,4 @@ size-plugin.json
 .DS_Store
 matter-controller-data
 .claude/scratch/
+.claude/worktrees/

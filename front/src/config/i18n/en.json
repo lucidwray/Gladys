@@ -1,4 +1,21 @@
 {
+  "hawrayGroupControl": {
+    "defaultName": "Group",
+    "editNameLabel": "Name",
+    "editNamePlaceholder": "Group",
+    "editFeaturesLabel": "Devices in the group",
+    "editHint": "Features of the same type are controlled together: one control drives all of them.",
+    "addFeatureLabel": "Add a feature to the group",
+    "removeFeature": "Remove from the group",
+    "noFeatures": "No feature selected yet.",
+    "deviceCountSingular": "1 device",
+    "deviceCountPlural": "{{count}} devices",
+    "showDevices": "Show devices",
+    "hideDevices": "Hide devices",
+    "writeFailed": "{{failed}} of {{total}} devices could not be updated.",
+    "loadFailed": "Could not load the devices of this group.",
+    "allFeaturesSuffix": "all features"
+  },
   "global": {
     "logoAlt": "Gladys logo",
     "needHelpText": "Need help? Join us on <a href=\"https://community.gladysassistant.com/\" target=\"_blank\" rel=\"noopener noreferrer\"> Gladys Community</a>.",
@@ -406,7 +423,8 @@
       "house-view": "House view",
       "external-widget": "Integration widget",
       "thermostat": "Thermostat",
-      "energy-price": "Electricity price"
+      "energy-price": "Electricity price",
+      "hawray-group-control": "Group control"
     },
     "boxes": {
       "column": "Column {{index}}",

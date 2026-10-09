@@ -14,9 +14,10 @@ SHA="$(git rev-parse --short HEAD)"
 echo "Building $IMAGE from $REF ($SHA)"
 
 # Front: same steps as .github/workflows/docker-dev-build.yml (npm ci + npm run build),
-# in a throwaway node:24 container so the server needs no Node install.
+# in a throwaway node:24 container so the server needs no Node install. The whole
+# repo is mounted: front/vite.config.mjs reads the version from the root package.json.
 docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp \
-  -v "$PWD/front:/front" -w /front node:24 sh -c 'npm ci && npm run build'
+  -v "$PWD:/src" -w /src/front node:24 sh -c 'npm ci && npm run build'
 
 # docker/Dockerfile.buildx expects the built front in ./static
 rm -rf static

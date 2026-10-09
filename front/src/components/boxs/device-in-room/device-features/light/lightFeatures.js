@@ -7,7 +7,13 @@ import {
   DEVICE_FEATURE_TYPES,
   DEVICE_FEATURE_UNITS
 } from '../../../../../../../server/utils/constants';
-import { hsbToRgb, intToHex, kelvinToRGB, miredToKelvin } from '../../../../../../../server/utils/colors';
+import {
+  hsbToRgb,
+  intToHex,
+  kelvinToMired,
+  kelvinToRGB,
+  miredToKelvin
+} from '../../../../../../../server/utils/colors';
 
 // The light feature types the light panel knows how to control. Anything else carried by a light
 // device (consumed power, effect mode, effect speed...) keeps its own regular row.
@@ -138,9 +144,15 @@ export const buildDeviceRows = (deviceFeatures = []) => {
 // Tasmota, Zigbee...), kelvins, or a plain 0-100 scale. The scale is decided once from the BOUNDS
 // of the feature — deciding value by value would put the two ends of a same slider on two
 // different scales.
-const TEMPERATURE_SCALES = { KELVIN: 'kelvin', MIRED: 'mired', RATIO: 'ratio' };
+export const TEMPERATURE_SCALES = { KELVIN: 'kelvin', MIRED: 'mired', RATIO: 'ratio' };
 
-const getTemperatureScale = feature => {
+/**
+ * @description Tells which scale a color temperature feature is expressed in.
+ * @param {object} feature - The light temperature device feature.
+ * @returns {string} One of TEMPERATURE_SCALES.
+ * @example getTemperatureScale({ min: 153, max: 500 });
+ */
+export const getTemperatureScale = feature => {
   if (feature.unit === DEVICE_FEATURE_UNITS.KELVIN) {
     return TEMPERATURE_SCALES.KELVIN;
   }
@@ -176,6 +188,28 @@ export const temperatureValueToKelvin = (feature, value) => {
   const max = Number.isFinite(feature.max) ? feature.max : 100;
   const ratio = max === min ? 0 : (value - min) / (max - min);
   return COLDEST_DISPLAYED_KELVIN - ratio * (COLDEST_DISPLAYED_KELVIN - WARMEST_DISPLAYED_KELVIN);
+};
+
+/**
+ * @description Converts kelvins to a color temperature value in the scale of the feature: the inverse
+ * of temperatureValueToKelvin. Lets a value be moved between lamps that use different scales.
+ * @param {object} feature - The light temperature device feature.
+ * @param {number} kelvin - The color temperature in kelvins.
+ * @returns {number} The value in the feature scale, not clamped to its bounds.
+ * @example kelvinToTemperatureValue({ min: 153, max: 500 }, 6535);
+ */
+export const kelvinToTemperatureValue = (feature, kelvin) => {
+  const scale = getTemperatureScale(feature);
+  if (scale === TEMPERATURE_SCALES.KELVIN) {
+    return kelvin;
+  }
+  if (scale === TEMPERATURE_SCALES.MIRED) {
+    return kelvin > 0 ? kelvinToMired(kelvin) : feature.max;
+  }
+  const min = Number.isFinite(feature.min) ? feature.min : 0;
+  const max = Number.isFinite(feature.max) ? feature.max : 100;
+  const ratio = (COLDEST_DISPLAYED_KELVIN - kelvin) / (COLDEST_DISPLAYED_KELVIN - WARMEST_DISPLAYED_KELVIN);
+  return min + ratio * (max - min);
 };
 
 /**

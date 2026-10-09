@@ -1,12 +1,14 @@
 const { expect } = require('chai');
 
 const db = require('../../models');
-const { DASHBOARD_BOX_TYPE, DASHBOARD_TYPE, DASHBOARD_VISIBILITY } = require('../../utils/constants');
+const { DASHBOARD_TYPE, DASHBOARD_VISIBILITY } = require('../../utils/constants');
 
 const USER_ID = '0cd30aef-9c4e-4a23-88e3-3547971296e5';
 
+// The literal, not the constant: a renamed type must break this test, since the front keys
+// (Box.jsx, EditBox.jsx, i18n) use the same string
 const groupControlBox = {
-  type: DASHBOARD_BOX_TYPE.HAWRAY_GROUP_CONTROL,
+  type: 'hawray-group-control',
   name: 'Ceiling lamps',
   device_features: ['lamp-1-brightness', 'lamp-2-brightness'],
 };

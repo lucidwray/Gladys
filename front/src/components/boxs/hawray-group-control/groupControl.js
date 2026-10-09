@@ -1,4 +1,12 @@
-import { DEVICE_FEATURE_CATEGORIES, DEVICE_FEATURE_TYPES } from '../../../../../server/utils/constants';
+import {
+  DEVICE_FEATURE_CATEGORIES,
+  DEVICE_FEATURE_TYPES,
+  DEVICE_FEATURE_UNITS
+} from '../../../../../server/utils/constants';
+import {
+  kelvinToTemperatureValue,
+  temperatureValueToKelvin
+} from '../device-in-room/device-features/light/lightFeatures';
 
 // Pure logic of the group control widget: grouping the features of several devices by type, reading
 // one aggregate value from them, and spreading a value written on the aggregate back to every member.
@@ -13,8 +21,12 @@ const GROUP_FEATURE_PREFIX = 'hawray-group';
 export const AGGREGATE_KIND = {
   // on/off: the group is on when any member is on
   BINARY: 'binary',
-  // a level on a range: the group shows the average of its members, each read through its own range
-  RANGE: 'range',
+  // a relative level (a share of the range): each member is read and written through its own range
+  RELATIVE: 'relative',
+  // a physical setpoint or current: the value is sent as it is, clamped to each member's bounds
+  PHYSICAL: 'physical',
+  // a light color temperature: converted through kelvins, since integrations use mireds, kelvins or a ratio
+  KELVIN: 'kelvin',
   // anything else (color, mode, select...): the group shows the member changed last, and a write is
   // sent unchanged to every member
   LATEST: 'latest'
@@ -23,37 +35,51 @@ export const AGGREGATE_KIND = {
 // Every category names its on/off type 'binary', so this one constant covers all of them.
 const BINARY_TYPE = DEVICE_FEATURE_TYPES.LIGHT.BINARY;
 
-const RANGE_FEATURES = [
-  [DEVICE_FEATURE_CATEGORIES.LIGHT, DEVICE_FEATURE_TYPES.LIGHT.BRIGHTNESS],
-  [DEVICE_FEATURE_CATEGORIES.LIGHT, DEVICE_FEATURE_TYPES.LIGHT.HUE],
-  [DEVICE_FEATURE_CATEGORIES.LIGHT, DEVICE_FEATURE_TYPES.LIGHT.SATURATION],
-  [DEVICE_FEATURE_CATEGORIES.LIGHT, DEVICE_FEATURE_TYPES.LIGHT.TEMPERATURE],
-  [DEVICE_FEATURE_CATEGORIES.SWITCH, DEVICE_FEATURE_TYPES.SWITCH.DIMMER],
-  [DEVICE_FEATURE_CATEGORIES.SWITCH, DEVICE_FEATURE_TYPES.SWITCH.TARGET_CURRENT],
-  [DEVICE_FEATURE_CATEGORIES.SHUTTER, DEVICE_FEATURE_TYPES.SHUTTER.POSITION],
-  [DEVICE_FEATURE_CATEGORIES.CURTAIN, DEVICE_FEATURE_TYPES.CURTAIN.POSITION],
-  [DEVICE_FEATURE_CATEGORIES.FAN, DEVICE_FEATURE_TYPES.FAN.PERCENT],
-  [DEVICE_FEATURE_CATEGORIES.FAN, DEVICE_FEATURE_TYPES.FAN.SPEED],
-  [DEVICE_FEATURE_CATEGORIES.TELEVISION, DEVICE_FEATURE_TYPES.TELEVISION.VOLUME],
-  [DEVICE_FEATURE_CATEGORIES.THERMOSTAT, DEVICE_FEATURE_TYPES.THERMOSTAT.TARGET_TEMPERATURE],
-  [DEVICE_FEATURE_CATEGORIES.AIR_CONDITIONING, DEVICE_FEATURE_TYPES.AIR_CONDITIONING.TARGET_TEMPERATURE],
-  [DEVICE_FEATURE_CATEGORIES.WATER_HEATER, DEVICE_FEATURE_TYPES.WATER_HEATER.TARGET_TEMPERATURE],
-  [
+const getKey = (category, type) => `${category}.${type}`;
+
+// A relative level has no physical unit: the same share of the range is the same effect on every lamp,
+// whatever its range (50 % brightness is 127 on a 0-254 lamp and 50 on a 0-100 one).
+const RELATIVE_KEYS = new Set([
+  getKey(DEVICE_FEATURE_CATEGORIES.LIGHT, DEVICE_FEATURE_TYPES.LIGHT.BRIGHTNESS),
+  getKey(DEVICE_FEATURE_CATEGORIES.LIGHT, DEVICE_FEATURE_TYPES.LIGHT.HUE),
+  getKey(DEVICE_FEATURE_CATEGORIES.LIGHT, DEVICE_FEATURE_TYPES.LIGHT.SATURATION),
+  getKey(DEVICE_FEATURE_CATEGORIES.SWITCH, DEVICE_FEATURE_TYPES.SWITCH.DIMMER),
+  getKey(DEVICE_FEATURE_CATEGORIES.SHUTTER, DEVICE_FEATURE_TYPES.SHUTTER.POSITION),
+  getKey(DEVICE_FEATURE_CATEGORIES.CURTAIN, DEVICE_FEATURE_TYPES.CURTAIN.POSITION),
+  getKey(DEVICE_FEATURE_CATEGORIES.FAN, DEVICE_FEATURE_TYPES.FAN.PERCENT),
+  getKey(DEVICE_FEATURE_CATEGORIES.TELEVISION, DEVICE_FEATURE_TYPES.TELEVISION.VOLUME),
+  getKey(
     DEVICE_FEATURE_CATEGORIES.ELECTRICAL_VEHICLE_CHARGE,
     DEVICE_FEATURE_TYPES.ELECTRICAL_VEHICLE_CHARGE.TARGET_CHARGE_LIMIT
-  ],
-  [DEVICE_FEATURE_CATEGORIES.ELECTRICAL_VEHICLE_CHARGE, DEVICE_FEATURE_TYPES.ELECTRICAL_VEHICLE_CHARGE.TARGET_CURRENT],
-  [
+  )
+]);
+
+// A setpoint or a current is a physical quantity: 20 degrees on a thermostat means 20 degrees whatever
+// its bounds, so these are never scaled between ranges.
+const PHYSICAL_KEYS = new Set([
+  getKey(DEVICE_FEATURE_CATEGORIES.THERMOSTAT, DEVICE_FEATURE_TYPES.THERMOSTAT.TARGET_TEMPERATURE),
+  getKey(DEVICE_FEATURE_CATEGORIES.AIR_CONDITIONING, DEVICE_FEATURE_TYPES.AIR_CONDITIONING.TARGET_TEMPERATURE),
+  getKey(DEVICE_FEATURE_CATEGORIES.WATER_HEATER, DEVICE_FEATURE_TYPES.WATER_HEATER.TARGET_TEMPERATURE),
+  getKey(
     DEVICE_FEATURE_CATEGORIES.ELECTRICAL_VEHICLE_CLIMATE,
     DEVICE_FEATURE_TYPES.ELECTRICAL_VEHICLE_CLIMATE.TARGET_TEMPERATURE
-  ]
-];
+  ),
+  getKey(DEVICE_FEATURE_CATEGORIES.SWITCH, DEVICE_FEATURE_TYPES.SWITCH.TARGET_CURRENT),
+  getKey(
+    DEVICE_FEATURE_CATEGORIES.ELECTRICAL_VEHICLE_CHARGE,
+    DEVICE_FEATURE_TYPES.ELECTRICAL_VEHICLE_CHARGE.TARGET_CURRENT
+  )
+]);
 
-const RANGE_FEATURE_KEYS = new Set(RANGE_FEATURES.map(([category, type]) => `${category}.${type}`));
+const LIGHT_TEMPERATURE_KEY = getKey(DEVICE_FEATURE_CATEGORIES.LIGHT, DEVICE_FEATURE_TYPES.LIGHT.TEMPERATURE);
+
+// The fan speed type has no unit of its own in the catalog: its own unit decides, a percentage (or no
+// unit) is a relative level, an absolute unit is physical.
+const FAN_SPEED_KEY = getKey(DEVICE_FEATURE_CATEGORIES.FAN, DEVICE_FEATURE_TYPES.FAN.SPEED);
 
 // Members are grouped by category AND type: the same type string is shared by several categories
 // (a fan mode and an air conditioning mode, for example), and they must never be averaged together.
-const getFeatureKey = feature => `${feature.category}.${feature.type}`;
+const getFeatureKey = feature => getKey(feature.category, feature.type);
 
 const isSet = value => value !== null && value !== undefined;
 
@@ -61,7 +87,7 @@ const isTextSelectFeature = feature =>
   feature.category === DEVICE_FEATURE_CATEGORIES.TEXT && feature.type === DEVICE_FEATURE_TYPES.TEXT.SELECT;
 
 /**
- * @description Tells how the value of a group of features is aggregated.
+ * @description Tells how the value of a group of features is aggregated and written.
  * @param {object} feature - A member feature, or a group feature (same category and type).
  * @returns {string} One of AGGREGATE_KIND.
  * @example getAggregateKind({ category: 'light', type: 'binary' });
@@ -70,17 +96,40 @@ export const getAggregateKind = feature => {
   if (feature.type === BINARY_TYPE) {
     return AGGREGATE_KIND.BINARY;
   }
-  if (RANGE_FEATURE_KEYS.has(getFeatureKey(feature))) {
-    return AGGREGATE_KIND.RANGE;
+  const key = getFeatureKey(feature);
+  if (key === LIGHT_TEMPERATURE_KEY) {
+    return AGGREGATE_KIND.KELVIN;
+  }
+  if (RELATIVE_KEYS.has(key)) {
+    return AGGREGATE_KIND.RELATIVE;
+  }
+  if (PHYSICAL_KEYS.has(key)) {
+    return AGGREGATE_KIND.PHYSICAL;
+  }
+  if (key === FAN_SPEED_KEY) {
+    const isAbsolute = Boolean(feature.unit) && feature.unit !== DEVICE_FEATURE_UNITS.PERCENT;
+    return isAbsolute ? AGGREGATE_KIND.PHYSICAL : AGGREGATE_KIND.RELATIVE;
   }
   return AGGREGATE_KIND.LATEST;
 };
 
-// Same defaults as the rest of the widgets: a feature without bounds reads as a percentage.
+// Same defaults as the rest of the widgets: a relative feature without bounds reads as a percentage.
 const getRange = feature => ({
   min: Number.isFinite(feature.min) ? feature.min : 0,
   max: Number.isFinite(feature.max) ? feature.max : 100
 });
+
+// Clamps to the bounds the feature declares; a missing bound does not restrict the value.
+const clampToBounds = (value, feature) => {
+  let result = value;
+  if (Number.isFinite(feature.min)) {
+    result = Math.max(feature.min, result);
+  }
+  if (Number.isFinite(feature.max)) {
+    result = Math.min(feature.max, result);
+  }
+  return result;
+};
 
 /**
  * @description Moves a value from one range onto another, keeping its position in the range.
@@ -128,11 +177,28 @@ const groupMembersByType = members => {
   return keys.map(key => membersByKey[key]);
 };
 
+// The options a group offers are those every member supports. Members that declare no
+// supported_options do not restrict the list. If the members have no option in common, the first
+// member's own list is kept: an empty list would make the rows fall back to the full catalog, which
+// is exactly what offering only supported options prevents. Writes a member rejects surface as an error.
+const getCommonSupportedOptions = members => {
+  const lists = members
+    .map(member => member.supported_options)
+    .filter(options => Array.isArray(options) && options.length > 0);
+  if (lists.length === 0) {
+    return undefined;
+  }
+  const [firstList] = lists;
+  const common = firstList.filter(option => lists.every(list => list.some(item => item.value === option.value)));
+  return common.length > 0 ? common : firstList;
+};
+
 // Builds the one virtual feature standing for a group of same-type members. The category, type,
 // bounds, step and unit come from the first member; the value is the aggregate.
 const aggregateGroup = members => {
   const [first] = members;
   const key = getFeatureKey(first);
+  const supportedOptions = getCommonSupportedOptions(members);
   const feature = {
     id: `${GROUP_FEATURE_PREFIX}:${key}`,
     selector: `${GROUP_FEATURE_PREFIX}:${key}`,
@@ -143,7 +209,8 @@ const aggregateGroup = members => {
     min: first.min,
     max: first.max,
     step: first.step,
-    read_only: false
+    read_only: false,
+    ...(supportedOptions ? { supported_options: supportedOptions } : {})
   };
   const kind = getAggregateKind(first);
 
@@ -159,7 +226,7 @@ const aggregateGroup = members => {
     };
   }
 
-  if (kind === AGGREGATE_KIND.RANGE) {
+  if (kind === AGGREGATE_KIND.RELATIVE) {
     const known = members.filter(member => Number.isFinite(member.last_value));
     if (known.length === 0) {
       return { ...feature, last_value: null, last_value_changed: null };
@@ -169,6 +236,34 @@ const aggregateGroup = members => {
     return {
       ...feature,
       last_value: roundToStep(total / known.length, first.step),
+      last_value_changed: getLastChanged(known).last_value_changed
+    };
+  }
+
+  if (kind === AGGREGATE_KIND.PHYSICAL) {
+    const known = members.filter(member => Number.isFinite(member.last_value));
+    if (known.length === 0) {
+      return { ...feature, last_value: null, last_value_changed: null };
+    }
+    const total = known.reduce((sum, member) => sum + member.last_value, 0);
+    return {
+      ...feature,
+      last_value: clampToBounds(roundToStep(total / known.length, first.step), first),
+      last_value_changed: getLastChanged(known).last_value_changed
+    };
+  }
+
+  if (kind === AGGREGATE_KIND.KELVIN) {
+    const known = members.filter(member => Number.isFinite(member.last_value));
+    if (known.length === 0) {
+      return { ...feature, last_value: null, last_value_changed: null };
+    }
+    // Averaged in kelvins, the one unit every lamp shares, then read back in the group scale
+    const totalKelvin = known.reduce((sum, member) => sum + temperatureValueToKelvin(member, member.last_value), 0);
+    const averageValue = kelvinToTemperatureValue(first, totalKelvin / known.length);
+    return {
+      ...feature,
+      last_value: clampToBounds(roundToStep(averageValue, first.step), first),
       last_value_changed: getLastChanged(known).last_value_changed
     };
   }
@@ -195,27 +290,47 @@ const aggregateGroup = members => {
 export const buildGroupFeatures = members => groupMembersByType(members).map(aggregateGroup);
 
 /**
+ * @description Converts a value written on the group into the value each member receives.
+ * @param {object} member - The member feature.
+ * @param {object} groupFeature - The virtual feature the value is written on.
+ * @param {string} kind - The aggregate kind of the group.
+ * @param {number} value - The value written, in the group scale.
+ * @returns {number} The value to send to the member.
+ */
+const getMemberValue = (member, groupFeature, kind, value) => {
+  if (kind === AGGREGATE_KIND.RELATIVE) {
+    return roundToStep(scaleToRange(value, getRange(groupFeature), getRange(member)), member.step);
+  }
+  if (kind === AGGREGATE_KIND.KELVIN) {
+    const kelvin = temperatureValueToKelvin(groupFeature, value);
+    return clampToBounds(roundToStep(kelvinToTemperatureValue(member, kelvin), member.step), member);
+  }
+  return clampToBounds(roundToStep(value, member.step), member);
+};
+
+/**
  * @description Lists the value to write on each member of a group feature, for a value written on
- * the group. Range members get the value scaled into their own bounds; on/off and shared values
- * are sent unchanged.
+ * the group. Relative members get the value scaled into their own range, color temperature members
+ * the same color through kelvins, physical members the value itself clamped to their bounds; on/off
+ * and shared values are sent unchanged.
  * @param {Array} members - The member features of the group.
  * @param {object} groupFeature - The virtual feature the value is written on.
- * @param {number|string} value - The value written, in the group feature range.
+ * @param {number|string} value - The value written, in the group feature scale.
  * @returns {Array} One { selector, value } per member of the same type.
  * @example planGroupWrites(members, groupFeature, 50);
  */
 export const planGroupWrites = (members, groupFeature, value) => {
   const kind = getAggregateKind(groupFeature);
-  const groupRange = getRange(groupFeature);
   const groupKey = getFeatureKey(groupFeature);
+  const numericValue = Number(value);
   return members
     .filter(member => getFeatureKey(member) === groupKey)
     .map(member => ({
       selector: member.selector,
       value:
-        kind === AGGREGATE_KIND.RANGE
-          ? roundToStep(scaleToRange(Number(value), groupRange, getRange(member)), member.step)
-          : value
+        kind === AGGREGATE_KIND.BINARY || kind === AGGREGATE_KIND.LATEST
+          ? value
+          : getMemberValue(member, groupFeature, kind, numericValue)
     }));
 };
 
@@ -228,7 +343,7 @@ export const planGroupWrites = (members, groupFeature, value) => {
  * @example normalizeMemberValue({ category: 'light', type: 'brightness' }, '50');
  */
 export const normalizeMemberValue = (feature, value) =>
-  getAggregateKind(feature) === AGGREGATE_KIND.RANGE ? Number(value) : value;
+  getAggregateKind(feature) === AGGREGATE_KIND.LATEST ? value : Number(value);
 
 const applyFeatureValue = (feature, value, changedAt) =>
   isTextSelectFeature(feature)

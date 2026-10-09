@@ -36,6 +36,9 @@ class GroupControlComponent extends Component {
     };
     this.wasDisconnected = false;
     this.debouncedSends = {};
+    this.unmounted = false;
+    // Each read of the devices gets a number: only the newest answer is kept
+    this.membersRequestId = 0;
   }
 
   handleWebsocketConnected = ({ connected }) => {
@@ -49,6 +52,10 @@ class GroupControlComponent extends Component {
   };
 
   getMembers = async ({ silent = false } = {}) => {
+    this.membersRequestId += 1;
+    const requestId = this.membersRequestId;
+    // An answer is applied only if it is still the newest one and the widget is still on screen
+    const isCurrent = () => !this.unmounted && requestId === this.membersRequestId;
     const selectors = this.props.box.device_features || [];
     if (selectors.length === 0) {
       this.setState({ members: [], status: RequestStatus.Success });
@@ -61,14 +68,16 @@ class GroupControlComponent extends Component {
       const devices = await this.props.httpClient.get('/api/v1/device', {
         device_feature_selectors: selectors.join(',')
       });
-      this.setState({
-        members: flattenMemberFeatures(devices, selectors),
-        status: RequestStatus.Success
-      });
+      if (isCurrent()) {
+        this.setState({
+          members: flattenMemberFeatures(devices, selectors),
+          status: RequestStatus.Success
+        });
+      }
     } catch (e) {
       console.error(e);
       // A silent refresh keeps what is on screen: the members are still there, only the read-back failed
-      if (!silent) {
+      if (isCurrent() && !silent) {
         this.setState({ status: RequestStatus.Error });
       }
     }
@@ -114,7 +123,7 @@ class GroupControlComponent extends Component {
       )
     );
     const failures = results.filter(result => result.status === 'rejected');
-    if (failures.length > 0) {
+    if (failures.length > 0 && !this.unmounted) {
       failures.forEach(failure => console.error(failure.reason));
       this.setState({ writeFailure: { failed: failures.length, total: writes.length } });
       // Read the devices back, so a member that refused the value stops showing it
@@ -175,6 +184,8 @@ class GroupControlComponent extends Component {
   }
 
   componentWillUnmount() {
+    // Set first: the pending writes flushed below must not set state on an unmounted widget
+    this.unmounted = true;
     this.props.session.dispatcher.removeListener(WEBSOCKET_MESSAGE_TYPES.DEVICE.NEW_STATE, this.updateStateWebsocket);
     this.props.session.dispatcher.removeListener(
       WEBSOCKET_MESSAGE_TYPES.DEVICE.NEW_STRING_STATE,
@@ -214,6 +225,12 @@ class GroupControlComponent extends Component {
       new_label: getDeviceFeatureName(dictionary, groupDevice, feature)
     }));
     const deviceCount = countDevices(members);
+    // DeviceCard sizes its loading skeleton from box.device_features: once loaded, that is one row per
+    // virtual feature rather than one per member. While loading, the number of members is all there is.
+    const cardBox =
+      displayedFeatures.length > 0
+        ? { ...props.box, device_features: displayedFeatures.map(feature => feature.selector) }
+        : props.box;
 
     return (
       <div>
@@ -226,6 +243,7 @@ class GroupControlComponent extends Component {
         </div>
         <DeviceCard
           {...props}
+          box={cardBox}
           loading={loading}
           boxTitle={groupName}
           deviceFeatures={displayedFeatures}

@@ -1,16 +1,16 @@
+import { Fragment } from 'preact';
 import { Text } from 'preact-i18n';
 import get from 'get-value';
 
-import { formatAbsoluteDate, getDisplayedParamValue } from './helpers';
+import { MASKED_SECRET, formatAbsoluteDate, getDisplayedParamValue } from './helpers';
+import style from './style.css';
 
-// Shown in place of the value of a param whose name looks like a credential
-const MASK = '••••••••';
-
+// One label and its value, two cells of the details grid (style.detailsList)
 const DetailRow = ({ label, children }) => (
-  <div class="row mb-2">
-    <dt class="col-sm-4 text-muted font-weight-normal">{label}</dt>
-    <dd class="col-sm-8 mb-0 text-break">{children}</dd>
-  </div>
+  <Fragment>
+    <dt class="text-muted">{label}</dt>
+    <dd class="text-break">{children}</dd>
+  </Fragment>
 );
 
 // Section f: what the device is, as the server knows it, and its params
@@ -26,7 +26,7 @@ const DeviceDetailsSection = ({ device, user, intl }) => {
       </h2>
       <div class="card">
         <div class="card-body">
-          <dl class="row mb-0">
+          <dl class={style.detailsList}>
             <DetailRow label={<Text id="hawrayControls.detail.details.model" />}>{device.model || '—'}</DetailRow>
             <DetailRow label={<Text id="hawrayControls.detail.details.externalId" />}>
               {device.external_id ? <code class="small">{device.external_id}</code> : '—'}
@@ -34,12 +34,18 @@ const DeviceDetailsSection = ({ device, user, intl }) => {
             <DetailRow label={<Text id="hawrayControls.detail.details.selector" />}>
               <code class="small">{device.selector}</code>
             </DetailRow>
-            <DetailRow label={<Text id="hawrayControls.detail.details.createdAt" />}>
-              {device.created_at ? formatAbsoluteDate(device.created_at, language) : '—'}
-            </DetailRow>
-            <DetailRow label={<Text id="hawrayControls.detail.details.updatedAt" />}>
-              {device.updated_at ? formatAbsoluteDate(device.updated_at, language) : '—'}
-            </DetailRow>
+            {/* The server sends both dates (the device as read from the database); a device without them
+                shows no row rather than an empty one */}
+            {device.created_at && (
+              <DetailRow label={<Text id="hawrayControls.detail.details.createdAt" />}>
+                {formatAbsoluteDate(device.created_at, language)}
+              </DetailRow>
+            )}
+            {device.updated_at && (
+              <DetailRow label={<Text id="hawrayControls.detail.details.updatedAt" />}>
+                {formatAbsoluteDate(device.updated_at, language)}
+              </DetailRow>
+            )}
             <DetailRow label={<Text id="hawrayControls.detail.details.shouldPoll" />}>
               {yesNo(device.should_poll)}
             </DetailRow>
@@ -72,7 +78,7 @@ const DeviceDetailsSection = ({ device, user, intl }) => {
                       <td class="text-break">
                         {displayed === null ? (
                           <span class="text-muted" title={get(intl.dictionary, 'hawrayControls.detail.details.masked')}>
-                            {MASK}
+                            {MASKED_SECRET}
                           </span>
                         ) : (
                           displayed

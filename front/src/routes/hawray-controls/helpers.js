@@ -13,13 +13,14 @@ const PUSH_TYPE = DEVICE_FEATURE_TYPES.BUTTON.PUSH;
 const SECRET_PARAM_NAME = /pass|pwd|token|secret|key|auth|credential/i;
 // scheme://user:password@host... : the password of a URL value (rtsp, http, mqtt...) is replaced
 const URL_PASSWORD = /^([a-z][a-z0-9+.-]*:\/\/[^/?#\s@:]*:)[^/?#\s]*@/i;
+// The one mask of the page: a masked URL password and a credential param both show it
 export const MASKED_SECRET = '****';
 
-// Ranges of the history charts and of the log, the same windows for both
+// Ranges of the log (the charts have their own range control)
 export const RANGES = [
-  { key: '24h', interval: 'last-day', hours: 24 },
-  { key: '7d', interval: 'last-week', hours: 7 * 24 },
-  { key: '30d', interval: 'last-month', hours: 30 * 24 }
+  { key: '24h', hours: 24 },
+  { key: '7d', hours: 7 * 24 },
+  { key: '30d', hours: 30 * 24 }
 ];
 
 export const DEFAULT_RANGE_KEY = '24h';

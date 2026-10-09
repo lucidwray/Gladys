@@ -15,6 +15,9 @@ const LOG_PAGE_SIZE = 100;
 const REQUEST_SIZE = 500;
 const MAX_REQUESTS_PER_PAGE = 2;
 const HOUR_IN_MS = 60 * 60 * 1000;
+// The log shows the latest VISIBLE_STEP entries, each "Show more" adds VISIBLE_STEP more: the entries already
+// loaded first, then the next page of the server once they are all shown
+const VISIBLE_STEP = 20;
 
 // The states as the log keeps them: the feature, its value and the moment it was saved
 const toEntry = state => ({
@@ -33,6 +36,7 @@ class DeviceLogSection extends Component {
     this.state = {
       rangeKey: DEFAULT_RANGE_KEY,
       entries: [],
+      visibleCount: VISIBLE_STEP,
       cursor: null,
       exhausted: false,
       loading: true,
@@ -51,7 +55,14 @@ class DeviceLogSection extends Component {
     const since = new Date(Date.now() - range.hours * HOUR_IN_MS).toISOString();
 
     if (reset) {
-      this.setState({ loading: true, error: false, entries: [], cursor: null, exhausted: false });
+      this.setState({
+        loading: true,
+        error: false,
+        entries: [],
+        visibleCount: VISIBLE_STEP,
+        cursor: null,
+        exhausted: false
+      });
     } else {
       this.setState({ loadingMore: true, error: false });
     }
@@ -114,11 +125,18 @@ class DeviceLogSection extends Component {
     this.setState({ rangeKey }, () => this.loadPage({ reset: true }));
   };
 
-  loadMore = () => {
-    this.loadPage({ reset: false });
+  // Shows VISIBLE_STEP more entries; asks the server for its next page only when the loaded ones run out
+  showMore = () => {
+    const { entries, visibleCount, exhausted, loadingMore } = this.state;
+    const nextCount = visibleCount + VISIBLE_STEP;
+    this.setState({ visibleCount: nextCount });
+    if (entries.length < nextCount && !exhausted && !loadingMore) {
+      this.loadPage({ reset: false });
+    }
   };
 
-  // A state received live goes on top of the log, unless it is already there
+  // A state received live goes on top of the log, unless it is already there. The number of rows shown does not
+  // grow with it: the oldest row shown moves under "Show more", so a page left open does not grow forever.
   addLiveEntry = (feature, lastValue, lastValueString, changedAt) => {
     const entry = {
       key: getLogEntryKey(changedAt, feature.id),
@@ -172,7 +190,7 @@ class DeviceLogSection extends Component {
   }
 
   renderEntries(user, dictionary) {
-    const { entries, loading, error, exhausted, loadingMore } = this.state;
+    const { entries, visibleCount, loading, error, exhausted, loadingMore } = this.state;
     const language = user ? user.language : null;
     const options = { user, dictionary };
 
@@ -218,7 +236,7 @@ class DeviceLogSection extends Component {
               </tr>
             </thead>
             <tbody>
-              {entries.map(entry => {
+              {entries.slice(0, visibleCount).map(entry => {
                 const value = formatFeatureValue(
                   { ...entry.feature, last_value: entry.value, last_value_string: entry.valueString },
                   options
@@ -239,15 +257,15 @@ class DeviceLogSection extends Component {
             </tbody>
           </table>
         </div>
-        {!exhausted && (
+        {(entries.length > visibleCount || !exhausted) && (
           <div class="card-footer text-center">
             <button
               type="button"
               class="btn btn-sm btn-outline-secondary"
               disabled={loadingMore}
-              onClick={this.loadMore}
+              onClick={this.showMore}
             >
-              <Text id={loadingMore ? 'hawrayControls.detail.log.loading' : 'hawrayControls.detail.log.loadMore'} />
+              <Text id={loadingMore ? 'hawrayControls.detail.log.loading' : 'hawrayControls.detail.log.showMore'} />
             </button>
           </div>
         )}

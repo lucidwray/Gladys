@@ -234,8 +234,10 @@ class ControlsDetail extends Component {
                 intl={props.intl}
               />
 
+              {/* DeviceCard always renders the theme spinner (.loader); the dashboard hides it with an inactive
+                  .dimmer around the widgets (DashboardPage). Same wrapper here: the device is loaded, no spinner. */}
               {device && (
-                <div class="mb-4">
+                <div class="mb-4 dimmer">
                   <DeviceCard
                     boxTitle={get(props.intl.dictionary, 'hawrayControls.detail.controls')}
                     box={{ device_features: selectors }}

@@ -1,5 +1,6 @@
 import { Component } from 'preact';
 import { Text } from 'preact-i18n';
+import { connect } from 'unistore/preact';
 import cx from 'classnames';
 
 import { WEBSOCKET_MESSAGE_TYPES } from '../../../../server/utils/constants';
@@ -8,11 +9,11 @@ import { DEFAULT_RANGE_KEY, RANGES, formatAbsoluteDate, formatFeatureValue, getL
 import style from './style.css';
 
 // The history endpoint answers for every device at once, so the log asks for the states of the device
-// by its name, then keeps the ones of its selector. A page is filled up to LOG_PAGE_SIZE entries, and
-// the reads stop after MAX_REQUESTS_PER_PAGE calls even when the device is quiet.
+// by its name, then keeps the ones of its selector. A page is filled up to LOG_PAGE_SIZE entries with at
+// most MAX_REQUESTS_PER_PAGE sequential requests of REQUEST_SIZE states (500 is the server's MAX_TAKE).
 const LOG_PAGE_SIZE = 100;
-const REQUEST_SIZE = 100;
-const MAX_REQUESTS_PER_PAGE = 10;
+const REQUEST_SIZE = 500;
+const MAX_REQUESTS_PER_PAGE = 2;
 const HOUR_IN_MS = 60 * 60 * 1000;
 
 // The states as the log keeps them: the feature, its value and the moment it was saved
@@ -291,4 +292,4 @@ class DeviceLogSection extends Component {
   }
 }
 
-export default DeviceLogSection;
+export default connect('httpClient,session')(DeviceLogSection);

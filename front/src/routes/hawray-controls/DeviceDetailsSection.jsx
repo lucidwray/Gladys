@@ -1,7 +1,7 @@
 import { Text } from 'preact-i18n';
 import get from 'get-value';
 
-import { formatAbsoluteDate, isSecretParam } from './helpers';
+import { formatAbsoluteDate, getDisplayedParamValue } from './helpers';
 
 // Shown in place of the value of a param whose name looks like a credential
 const MASK = '••••••••';
@@ -62,19 +62,20 @@ const DeviceDetailsSection = ({ device, user, intl }) => {
             <table class="table card-table table-vcenter">
               <tbody>
                 {params.map(param => {
-                  const masked = isSecretParam(param.name);
+                  // null: a credential, its value is never rendered (not even in a title attribute)
+                  const displayed = getDisplayedParamValue(param);
                   return (
                     <tr key={param.name}>
                       <td class="text-muted">
                         <code class="small">{param.name}</code>
                       </td>
                       <td class="text-break">
-                        {masked ? (
+                        {displayed === null ? (
                           <span class="text-muted" title={get(intl.dictionary, 'hawrayControls.detail.details.masked')}>
                             {MASK}
                           </span>
                         ) : (
-                          `${param.value}`
+                          displayed
                         )}
                       </td>
                     </tr>

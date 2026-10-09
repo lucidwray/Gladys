@@ -9,8 +9,11 @@ const BRIGHTNESS_TYPE = DEVICE_FEATURE_TYPES.LIGHT.BRIGHTNESS;
 const COLOR_TYPE = DEVICE_FEATURE_TYPES.LIGHT.COLOR;
 const PUSH_TYPE = DEVICE_FEATURE_TYPES.BUTTON.PUSH;
 
-// Values whose params hold a credential: shown masked on the device page
-const SECRET_PARAM_NAME = /password|token|secret|key/i;
+// Params whose name says they hold a credential: shown masked on the device page, value never displayed
+const SECRET_PARAM_NAME = /pass|pwd|token|secret|key|auth|credential/i;
+// scheme://user:password@host... : the password of a URL value (rtsp, http, mqtt...) is replaced
+const URL_PASSWORD = /^([a-z][a-z0-9+.-]*:\/\/[^/?#\s@:]*:)[^/?#\s]*@/i;
+export const MASKED_SECRET = '****';
 
 // Ranges of the history charts and of the log, the same windows for both
 export const RANGES = [
@@ -142,7 +145,21 @@ export const getDeviceSummary = (features, options) => {
 // Icon of a device: its switch when it has one, else its first feature
 export const getDeviceIconFeature = features => features.find(isWritableBinaryFeature) || features[0] || {};
 
-export const isSecretParam = name => SECRET_PARAM_NAME.test(name || '');
+/**
+ * @description Tells what a param may show on the device page. A param whose name looks like a credential
+ * shows no value at all. Any other value that is a URL with a password in it shows the URL with the
+ * password masked. The raw value never leaves this function for a masked param.
+ * @param {object} param - { name, value } of the device.
+ * @returns {string|null} The text to display, or null when the value is a credential.
+ * @example getDisplayedParamValue({ name: 'CAMERA_URL', value: 'rtsp://user:pw@10.0.0.2/live' });
+ */
+export const getDisplayedParamValue = param => {
+  if (SECRET_PARAM_NAME.test(param.name || '')) {
+    return null;
+  }
+  const value = param.value === null || param.value === undefined ? '' : `${param.value}`;
+  return value.replace(URL_PASSWORD, `$1${MASKED_SECRET}@`);
+};
 
 export const formatAbsoluteDate = (date, language) =>
   dayjs(date)

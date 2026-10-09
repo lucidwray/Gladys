@@ -38,18 +38,28 @@ class ControlsDetail extends Component {
       notFound: false
     };
     this.wasDisconnected = false;
+    this.deviceRequestId = 0;
     this.debouncedSendValues = new Map();
   }
 
   getDevice = async () => {
+    // Only the answer of the latest request is applied: an older one (a device left before its answer came)
+    // must never replace the device on screen
+    this.deviceRequestId += 1;
+    const requestId = this.deviceRequestId;
+    const { deviceSelector } = this.props;
     this.setState({ status: RequestStatus.Getting, notFound: false });
     try {
-      const device = await this.props.httpClient.get(`/api/v1/device/${encodeURIComponent(this.props.deviceSelector)}`);
-      this.setState({ device, status: RequestStatus.Success });
+      const device = await this.props.httpClient.get(`/api/v1/device/${encodeURIComponent(deviceSelector)}`);
+      if (requestId === this.deviceRequestId) {
+        this.setState({ device, status: RequestStatus.Success });
+      }
     } catch (e) {
       console.error(e);
-      const notFound = Boolean(e.response && e.response.status === 404);
-      this.setState({ device: null, status: RequestStatus.Error, notFound });
+      if (requestId === this.deviceRequestId) {
+        const notFound = Boolean(e.response && e.response.status === 404);
+        this.setState({ device: null, status: RequestStatus.Error, notFound });
+      }
     }
   };
 
@@ -159,6 +169,8 @@ class ControlsDetail extends Component {
   }
 
   componentWillUnmount() {
+    // An answer still on its way is ignored: the page is gone
+    this.deviceRequestId += 1;
     this.props.session.dispatcher.removeListener(
       WEBSOCKET_MESSAGE_TYPES.DEVICE.NEW_STATE,
       this.updateDeviceStateWebsocket

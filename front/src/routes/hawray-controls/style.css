@@ -15,26 +15,26 @@
   letter-spacing: 0.04em;
 }
 
+/* The whole tile opens the device page: a pointer and a visible focus ring tell it */
 .tile {
   min-width: 0;
+  cursor: pointer;
+}
+
+.tile:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }
 
 .tileBody {
   min-width: 0;
 }
 
-/* The whole tile is the link to the device page (stretched link): the switch sits above it */
 .tileName {
-  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: inherit;
   font-weight: 600;
-}
-
-.tileName:hover {
-  text-decoration: none;
 }
 
 .tileSummary {

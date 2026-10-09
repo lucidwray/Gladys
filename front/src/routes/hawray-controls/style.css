@@ -1,0 +1,73 @@
+.controlsPage {
+  min-height: 100%;
+}
+
+.toolbar {
+  gap: 0;
+}
+
+.toolbar > * {
+  min-width: 0;
+}
+
+.roomTitle {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tile {
+  min-width: 0;
+}
+
+.tileBody {
+  min-width: 0;
+}
+
+/* The whole tile is the link to the device page (stretched link): the switch sits above it */
+.tileName {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  font-weight: 600;
+}
+
+.tileName:hover {
+  text-decoration: none;
+}
+
+.tileSummary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tileToggle {
+  position: relative;
+  z-index: 2;
+}
+
+.skeleton {
+  height: 84px;
+  opacity: 0.5;
+}
+
+.backLink {
+  color: inherit;
+}
+
+.titleSkeleton {
+  width: 50%;
+  height: 2rem;
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.15);
+}
+
+.deviceTitle {
+  overflow-wrap: anywhere;
+}
+
+.sectionHeader {
+  gap: 0.5rem;
+}

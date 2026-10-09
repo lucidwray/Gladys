@@ -7131,5 +7131,82 @@
     "closed": "Geschlossen",
     "on": "An",
     "off": "Aus"
+  },
+  "hawrayControls": {
+    "nav": "Steuerung",
+    "list": {
+      "title": "Steuerung",
+      "deviceCount": {
+        "one": "{{count}} Gerät",
+        "other": "{{count}} Geräte"
+      },
+      "error": "Die Geräte konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "empty": "Noch keine Geräte. Sie erscheinen hier, sobald eine Integration sie hinzufügt.",
+      "noMatch": "Kein Gerät entspricht diesen Filtern.",
+      "noRoom": "Kein Raum",
+      "allRooms": "Alle Räume",
+      "searchPlaceholder": "Gerät suchen",
+      "lastSeen": "Zuletzt gesehen",
+      "noState": "Kein Zustand",
+      "toggle": "{{name}} ein- oder ausschalten"
+    },
+    "detail": {
+      "back": "Alle Steuerungen",
+      "notFound": "Dieses Gerät existiert nicht oder wurde gelöscht.",
+      "error": "Das Gerät konnte nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "integration": "Integration:",
+      "noRoom": "Kein Raum",
+      "controls": "Steuerung",
+      "features": {
+        "title": "Funktionen",
+        "empty": "Dieses Gerät hat keine Funktion.",
+        "name": "Name",
+        "type": "Typ",
+        "unit": "Einheit",
+        "range": "Bereich",
+        "access": "Zugriff",
+        "lastValue": "Letzter Wert",
+        "lastChanged": "Letzte Änderung",
+        "selector": "Selektor",
+        "readOnly": "Nur lesen",
+        "writable": "Schreibbar"
+      },
+      "history": {
+        "title": "Verlauf",
+        "empty": "Keine numerische Funktion für ein Diagramm auf diesem Gerät."
+      },
+      "ranges": {
+        "24h": "24 h",
+        "7d": "7 Tage",
+        "30d": "30 Tage"
+      },
+      "log": {
+        "title": "Letzte Änderungen",
+        "empty": "Keine Zustandsänderung in diesem Zeitraum.",
+        "error": "Der Verlauf konnte nicht geladen werden.",
+        "time": "Zeit",
+        "feature": "Funktion",
+        "value": "Wert",
+        "loadMore": "Mehr laden",
+        "loading": "Lädt…"
+      },
+      "details": {
+        "title": "Gerätedetails",
+        "model": "Modell",
+        "externalId": "Externe ID",
+        "selector": "Selektor",
+        "createdAt": "Erstellt",
+        "updatedAt": "Aktualisiert",
+        "shouldPoll": "Abgefragt",
+        "pollFrequency": "Abfrageintervall",
+        "yes": "Ja",
+        "no": "Nein",
+        "params": "Parameter",
+        "noParams": "Keine Parameter.",
+        "masked": "Verborgen: Dieser Parameter enthält ein Geheimnis"
+      }
+    }
   }
 }

@@ -16,6 +16,7 @@ module.exports = function UsbController({ list }) {
           comName: port.manufacturer,
           comPID: port.productId,
           comVID: port.vendorId,
+          comStablePath: typeof port.pnpId === 'string' && port.pnpId !== '' ? `/dev/serial/by-id/${port.pnpId}` : null,
         };
       }),
     );

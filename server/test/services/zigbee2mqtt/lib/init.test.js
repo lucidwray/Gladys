@@ -230,6 +230,53 @@ describe('zigbee2mqtt init', () => {
     assert.calledOnce(zigbee2mqttManager.isEnabled);
   });
 
+  it('should install containers, stored by-id path matches the port through pnpId', async () => {
+    // PREPARE
+    const config = {
+      z2mDriverPath: '/dev/serial/by-id/usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus-if00',
+      mqttPassword: 'mqttPassword',
+    };
+    zigbee2mqttManager.getConfiguration.resolves({ ...config });
+    zigbee2mqttManager.isEnabled.returns(false);
+    gladys.service.getService = fake.returns({
+      list: fake.resolves([
+        {
+          path: '/dev/ttyACM1',
+          pnpId: 'usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus-if00',
+        },
+      ]),
+    });
+
+    // EXECUTE
+    await zigbee2mqttManager.init();
+    // ASSERT
+    expect(zigbee2mqttManager.usbConfigured).to.equal(true);
+    assert.calledOnce(zigbee2mqttManager.installZ2mContainer);
+  });
+
+  it('should not install containers, stored by-id path matches no port', async () => {
+    // PREPARE
+    const config = {
+      z2mDriverPath: '/dev/serial/by-id/usb-NotPlugged-if00',
+      mqttPassword: 'mqttPassword',
+    };
+    zigbee2mqttManager.getConfiguration.resolves({ ...config });
+    gladys.service.getService = fake.returns({
+      list: fake.resolves([
+        {
+          path: '/dev/ttyACM1',
+          pnpId: 'usb-ITead_Sonoff_Zigbee_3.0_USB_Dongle_Plus-if00',
+        },
+      ]),
+    });
+
+    // EXECUTE
+    await zigbee2mqttManager.init();
+    // ASSERT
+    expect(zigbee2mqttManager.usbConfigured).to.equal(false);
+    assert.notCalled(zigbee2mqttManager.installZ2mContainer);
+  });
+
   it('should save default mqtt params', async () => {
     // PREPARE
     const config = { mqttMode: 'local', z2mDriverPath: '/dev/ttyUSB0' };

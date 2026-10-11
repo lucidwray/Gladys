@@ -98,8 +98,12 @@ class SetupLocalOptions extends Component {
       // Remove duplicated (dupe /dev/ttyUSB0 seen with Synology systems)
       const usbPortsMap = {};
       rawUsbPorts.forEach(usbPort => {
-        const label = [usbPort.comPath, usbPort.comName, usbPort.comVID].filter(Boolean).join(' - ');
-        usbPortsMap[usbPort.comPath] = { label, value: usbPort.comPath };
+        const value = usbPort.comStablePath || usbPort.comPath;
+        let label = [value, usbPort.comName, usbPort.comVID].filter(Boolean).join(' - ');
+        if (usbPort.comStablePath) {
+          label = `${label} (${usbPort.comPath})`;
+        }
+        usbPortsMap[value] = { label, value };
       });
       const usbPorts = Object.values(usbPortsMap);
       this.setState({

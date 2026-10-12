@@ -6,6 +6,96 @@ const EXPOSURE_MODES = {
   SELECTION: 'selection'
 };
 
+// Scene switches: a HomeKit switch that runs a Gladys scene. The configuration is written by this page
+// as the HOMEKIT_SCENE_SWITCHES variable, in the format the server reads.
+const SCENE_SWITCH_TYPES = {
+  MOMENTARY: 'momentary',
+  TOGGLE: 'toggle'
+};
+
+const SCENE_SWITCH_PROBLEMS = {
+  NAME: 'hawrayHomekitSceneSwitches.problemName',
+  SCENE: 'hawrayHomekitSceneSwitches.problemScene',
+  OFF_SCENE: 'hawrayHomekitSceneSwitches.problemOffScene'
+};
+
+// Same shape as the ids the server accepts: lowercase letters, digits and dashes. A plain generator is
+// used because crypto.randomUUID does not exist on a page served over plain HTTP on the local network.
+const newSceneSwitchId = () =>
+  `${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+
+/**
+ * @description Turn the stored configuration into rows the page can edit. An unreadable configuration
+ * gives no rows rather than an error: the page then starts empty, as it does before any switch exists.
+ * @param {string} value - Raw value of the HOMEKIT_SCENE_SWITCHES variable.
+ * @returns {Array} Rows, each with id, name, type, onSceneId and offSceneId.
+ * @example
+ * readSceneSwitchRows('[{"id":"a","name":"A","type":"momentary","on_scene_id":"s1"}]');
+ */
+function readSceneSwitchRows(value) {
+  let entries;
+  try {
+    entries = JSON.parse(value);
+  } catch (e) {
+    return [];
+  }
+  if (!Array.isArray(entries)) {
+    return [];
+  }
+
+  return entries
+    .filter(entry => entry !== null && typeof entry === 'object')
+    .map(entry => ({
+      id: typeof entry.id === 'string' && entry.id !== '' ? entry.id : newSceneSwitchId(),
+      name: typeof entry.name === 'string' ? entry.name : '',
+      type: entry.type === SCENE_SWITCH_TYPES.TOGGLE ? SCENE_SWITCH_TYPES.TOGGLE : SCENE_SWITCH_TYPES.MOMENTARY,
+      onSceneId: typeof entry.on_scene_id === 'string' ? entry.on_scene_id : '',
+      offSceneId: typeof entry.off_scene_id === 'string' ? entry.off_scene_id : ''
+    }));
+}
+
+/**
+ * @description Check the rows of the page and turn them into the configuration the server reads. A
+ * switch without a name takes the name of its on scene.
+ * @param {Array} rows - Rows of the page, as read by readSceneSwitchRows.
+ * @param {Array} scenes - Scenes that exist in Gladys.
+ * @returns {object} Either `{ problem }` naming the first thing to fix, or `{ configuration }`.
+ * @example
+ * buildSceneSwitchConfiguration(rows, scenes);
+ */
+function buildSceneSwitchConfiguration(rows, scenes) {
+  const sceneNames = new Map(scenes.map(scene => [scene.id, scene.name]));
+  const problems = [];
+
+  const configuration = rows.map(row => {
+    const toggle = row.type === SCENE_SWITCH_TYPES.TOGGLE;
+    const onSceneName = sceneNames.get(row.onSceneId);
+    if (onSceneName === undefined) {
+      problems.push(SCENE_SWITCH_PROBLEMS.SCENE);
+    }
+    if (toggle && !sceneNames.has(row.offSceneId)) {
+      problems.push(SCENE_SWITCH_PROBLEMS.OFF_SCENE);
+    }
+
+    const name = String(row.name || '').trim() || onSceneName || '';
+    if (name === '') {
+      problems.push(SCENE_SWITCH_PROBLEMS.NAME);
+    }
+
+    return {
+      id: row.id,
+      name,
+      type: row.type,
+      on_scene_id: row.onSceneId,
+      ...(toggle ? { off_scene_id: row.offSceneId } : {})
+    };
+  });
+
+  return problems.length > 0 ? { problem: problems[0] } : { configuration };
+}
+
 const actions = store => ({
   async getHomeKitSettings(state) {
     store.setState({
@@ -45,6 +135,22 @@ const actions = store => ({
         // the pairing QR code with it.
       }
 
+      // The scene list only feeds the scene switches. Failing to read it must not take down the pairing
+      // QR code with it.
+      let homekitScenes = [];
+      try {
+        homekitScenes = await state.httpClient.get('/api/v1/scene');
+      } catch (e) {
+        // No scene list: the scene switches section shows its empty state
+      }
+      let homekitSceneSwitches = [];
+      try {
+        const { value } = await state.httpClient.get('/api/v1/service/homekit/variable/HOMEKIT_SCENE_SWITCHES');
+        homekitSceneSwitches = readSceneSwitchRows(value);
+      } catch (e) {
+        // Variable not set yet, or unreadable
+      }
+
       QRCode.toDataURL(setupURI, (err, dataUrl) => {
         store.setState({
           homekitSetupDataUrl: dataUrl,
@@ -53,6 +159,8 @@ const actions = store => ({
             homekitExposureMode === EXPOSURE_MODES.SELECTION ? homekitExposureMode : EXPOSURE_MODES.ALL,
           homekitExposedDevices: Array.isArray(homekitExposedDevices) ? homekitExposedDevices : [],
           homekitCompatibleDevices,
+          homekitScenes: Array.isArray(homekitScenes) ? homekitScenes : [],
+          homekitSceneSwitches,
           homekitGetSettingsStatus: RequestStatus.Success
         });
       });
@@ -90,6 +198,49 @@ const actions = store => ({
       store.setState({ homekitSaveExposureStatus: RequestStatus.Success });
     } catch (e) {
       store.setState({ homekitSaveExposureStatus: RequestStatus.Error });
+    }
+  },
+  addSceneSwitch(state) {
+    store.setState({
+      homekitSceneSwitches: [
+        ...(state.homekitSceneSwitches || []),
+        { id: newSceneSwitchId(), name: '', type: SCENE_SWITCH_TYPES.MOMENTARY, onSceneId: '', offSceneId: '' }
+      ]
+    });
+  },
+  removeSceneSwitch(state, id) {
+    store.setState({
+      homekitSceneSwitches: (state.homekitSceneSwitches || []).filter(row => row.id !== id)
+    });
+  },
+  updateSceneSwitch(state, id, changes) {
+    store.setState({
+      homekitSceneSwitches: (state.homekitSceneSwitches || []).map(row =>
+        row.id === id ? { ...row, ...changes } : row
+      )
+    });
+  },
+  async saveSceneSwitches(state, e) {
+    e.preventDefault();
+    const { configuration, problem } = buildSceneSwitchConfiguration(
+      state.homekitSceneSwitches || [],
+      state.homekitScenes || []
+    );
+    if (problem) {
+      store.setState({ homekitSaveSceneSwitchesStatus: RequestStatus.Error, homekitSceneSwitchesProblem: problem });
+      return;
+    }
+
+    store.setState({ homekitSaveSceneSwitchesStatus: RequestStatus.Getting, homekitSceneSwitchesProblem: null });
+    try {
+      await state.httpClient.post('/api/v1/service/homekit/variable/HOMEKIT_SCENE_SWITCHES', {
+        value: JSON.stringify(configuration)
+      });
+      // Rebuild the bridge so the switches reach the Home app, keeping the existing pairing
+      await state.httpClient.get('/api/v1/service/homekit/reload');
+      store.setState({ homekitSaveSceneSwitchesStatus: RequestStatus.Success });
+    } catch (err) {
+      store.setState({ homekitSaveSceneSwitchesStatus: RequestStatus.Error, homekitSceneSwitchesProblem: null });
     }
   },
   updateMDNSAdvertiser(state, e) {
@@ -149,5 +300,5 @@ const actions = store => ({
   }
 });
 
-export { EXPOSURE_MODES };
+export { EXPOSURE_MODES, SCENE_SWITCH_TYPES };
 export default actions;

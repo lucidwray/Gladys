@@ -8,6 +8,7 @@ import style from './style.css';
 import DeviceConfigurationLink from '../../../../components/documentation/DeviceConfigurationLink';
 import { EXPOSURE_MODES } from './actions';
 import IntegrationSubPageLayout from '../../../../components/integration/IntegrationSubPageLayout';
+import SceneSwitches from './SceneSwitches';
 import withIntlAsProp from '../../../../utils/withIntlAsProp';
 
 const mdnsAdvertisers = {
@@ -155,6 +156,7 @@ const HomKitPage = ({ children, ...props }) => (
                     <Text id="integration.homekit.saveExposureError" />
                   </div>
                 )}
+                <SceneSwitches {...props} />
                 <p className={style.buttonDescription}>
                   <Text id={`integration.homekit.reload`} />
                 </p>

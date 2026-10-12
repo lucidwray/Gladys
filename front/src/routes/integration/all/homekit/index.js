@@ -14,12 +14,13 @@ class HomeKitIntegration extends Component {
       props.homkitGetSettingsStatus === RequestStatus.Getting ||
       props.homekitReloadStatus === RequestStatus.Getting ||
       props.homekitResetStatus === RequestStatus.Getting ||
-      props.homekitSaveExposureStatus === RequestStatus.Getting;
+      props.homekitSaveExposureStatus === RequestStatus.Getting ||
+      props.homekitSaveSceneSwitchesStatus === RequestStatus.Getting;
     return <HomeKitPage {...props} loading={loading} />;
   }
 }
 
 export default connect(
-  'user,homekitSetupDataUrl,homekitMdnsAdvertiser,homekitSaveMDNSStatus,homkitGetSettingsStatus,homekitReloadStatus,homekitResetStatus,homekitExposureMode,homekitExposedDevices,homekitCompatibleDevices,homekitSaveExposureStatus',
+  'user,homekitSetupDataUrl,homekitMdnsAdvertiser,homekitSaveMDNSStatus,homkitGetSettingsStatus,homekitReloadStatus,homekitResetStatus,homekitExposureMode,homekitExposedDevices,homekitCompatibleDevices,homekitSaveExposureStatus,homekitScenes,homekitSceneSwitches,homekitSaveSceneSwitchesStatus,homekitSceneSwitchesProblem',
   actions
 )(HomeKitIntegration);

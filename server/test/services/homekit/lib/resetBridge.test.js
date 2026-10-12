@@ -31,4 +31,32 @@ describe('Reset bridge', () => {
     expect(homekitHandler.bridge).to.eq(null);
     expect(homekitHandler.createBridge.callCount).to.eq(1);
   });
+
+  it('should cancel the momentary scene switches still waiting to turn off before rebuilding', async () => {
+    const clock = sinon.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const resetOn = stub();
+    const homekitHandler = {
+      resetBridge,
+      createBridge: stub().resolves(),
+      gladys: {
+        event: {
+          removeListener: stub().returns(),
+        },
+      },
+      notifyCb: null,
+      bridge: null,
+      sceneSwitchTimeouts: new Map([['movie-night', setTimeout(resetOn, 1000)]]),
+    };
+
+    try {
+      await homekitHandler.resetBridge();
+      clock.tick(1000);
+    } finally {
+      clock.restore();
+    }
+
+    expect(resetOn.callCount).to.equal(0);
+    expect(homekitHandler.sceneSwitchTimeouts.size).to.equal(0);
+    expect(homekitHandler.createBridge.callCount).to.equal(1);
+  });
 });

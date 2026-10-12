@@ -3,6 +3,8 @@ const { stopBridge } = require('./stopBridge');
 const { resetBridge } = require('./resetBridge');
 const { buildAccessory } = require('./buildAccessory');
 const { buildAlarmAccessory } = require('./buildAlarmAccessory');
+const { buildSceneSwitchAccessory } = require('./buildSceneSwitchAccessory');
+const { getSceneSwitches, saveSceneSwitchToggleState } = require('./sceneSwitches');
 const { buildService } = require('./buildService');
 const { newPinCode } = require('./newPinCode');
 const { newUsername } = require('./newUsername');
@@ -26,6 +28,8 @@ const HomeKitHandler = function HomeKitHandler(gladys, serviceId, hap) {
   this.bridge = null;
   this.notifyTimeouts = {};
   this.alarmAccessories = new Map();
+  this.sceneSwitchAccessories = new Map();
+  this.sceneSwitchTimeouts = new Map();
   this.notifyCb = null;
 };
 
@@ -36,6 +40,9 @@ HomeKitHandler.prototype.stopBridge = stopBridge;
 HomeKitHandler.prototype.resetBridge = resetBridge;
 HomeKitHandler.prototype.buildAccessory = buildAccessory;
 HomeKitHandler.prototype.buildAlarmAccessory = buildAlarmAccessory;
+HomeKitHandler.prototype.buildSceneSwitchAccessory = buildSceneSwitchAccessory;
+HomeKitHandler.prototype.getSceneSwitches = getSceneSwitches;
+HomeKitHandler.prototype.saveSceneSwitchToggleState = saveSceneSwitchToggleState;
 HomeKitHandler.prototype.buildService = buildService;
 HomeKitHandler.prototype.notifyChange = notifyChange;
 HomeKitHandler.prototype.sendState = sendState;

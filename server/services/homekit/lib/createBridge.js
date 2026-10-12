@@ -73,21 +73,45 @@ async function createBridge() {
   // growing instance with no bridge at all rather than with too many accessories. The extra devices
   // are left out instead, and the log says where to choose which ones are kept. Alarms are counted
   // first: there are one or two of them, and a house alarm is not what someone wants dropped.
-  const roomForDevices = Math.max(0, MAX_BRIDGED_ACCESSORIES - builtAlarms.length);
+  // Scene switches come after the alarms and before the devices: they are what the user set up on
+  // purpose, and a device left out costs less than a scene switch they were counting on. Each one is
+  // built on its own, so a broken entry is dropped without costing the others.
+  const sceneSwitches = await this.getSceneSwitches();
+  const builtSceneSwitches = [];
+  sceneSwitches.forEach((sceneSwitch) => {
+    try {
+      builtSceneSwitches.push({ sceneSwitch, accessory: this.buildSceneSwitchAccessory(sceneSwitch) });
+    } catch (e) {
+      logger.error(`HomeKit: scene switch ${sceneSwitch.id} could not be exposed: ${e.message}`);
+    }
+  });
+
+  const roomForSceneSwitches = Math.max(0, MAX_BRIDGED_ACCESSORIES - builtAlarms.length);
+  const bridgedSceneSwitches = builtSceneSwitches.slice(0, roomForSceneSwitches);
+  const leftOutSceneSwitches = builtSceneSwitches.slice(roomForSceneSwitches);
+
+  const roomForDevices = Math.max(0, roomForSceneSwitches - bridgedSceneSwitches.length);
+  const leftOutDevices = builtDevices.slice(roomForDevices);
   // Sliced once more at the end rather than trusting the reservation above: a house count of its own
   // over the limit is absurd, but a guard whose whole purpose is that the bridge always publishes
   // may not have a case where it throws anyway.
-  const bridged = [...builtDevices.slice(0, roomForDevices), ...builtAlarms].slice(0, MAX_BRIDGED_ACCESSORIES);
+  const bridged = [...builtDevices.slice(0, roomForDevices), ...bridgedSceneSwitches, ...builtAlarms].slice(
+    0,
+    MAX_BRIDGED_ACCESSORIES,
+  );
   const bridgedAccessories = bridged.map(({ accessory }) => accessory);
-  const leftOutDevices = builtDevices.slice(roomForDevices);
+  const totalAccessories = builtDevices.length + builtSceneSwitches.length + builtAlarms.length;
 
-  if (builtDevices.length + builtAlarms.length > bridgedAccessories.length) {
+  if (totalAccessories > bridgedAccessories.length) {
     // Named, not just counted: `device.get` sorts by name, so the devices left out are the last ones
     // alphabetically and nothing on screen says which tiles went missing.
-    const names = leftOutDevices.map(({ device }) => device.selector).join(', ');
+    const names = [
+      ...leftOutDevices.map(({ device }) => device.selector),
+      ...leftOutSceneSwitches.map(({ sceneSwitch }) => `scene switch "${sceneSwitch.name}"`),
+    ].join(', ');
 
     logger.warn(
-      `HomeKit: ${builtDevices.length + builtAlarms.length} accessories to expose, HomeKit allows ` +
+      `HomeKit: ${totalAccessories} accessories to expose, HomeKit allows ` +
         `${MAX_BRIDGED_ACCESSORIES} on a bridge. Left out: ${names || 'house alarms'} — choose the ones to ` +
         `expose in the HomeKit settings.`,
     );
@@ -97,6 +121,11 @@ async function createBridge() {
   // does not carry.
   this.alarmAccessories = new Map(
     bridged.filter(({ house }) => house !== undefined).map(({ house, accessory }) => [house.selector, accessory]),
+  );
+  this.sceneSwitchAccessories = new Map(
+    bridged
+      .filter(({ sceneSwitch }) => sceneSwitch !== undefined)
+      .map(({ sceneSwitch, accessory }) => [sceneSwitch.id, accessory]),
   );
 
   if (this.bridge) {

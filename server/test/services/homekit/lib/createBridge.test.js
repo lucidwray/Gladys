@@ -39,6 +39,7 @@ function buildHandler(overrides = {}) {
     buildAlarmAccessory: stub().returns({ UUID: 'e1b0a9cf-3f6f-4f2e-9f6b-2c0a7f4a1d55' }),
     getExposedAlarms: stub().resolves([HOUSE_ALARM]),
     getExposedDevices: stub().resolves([LAMP]),
+    getSceneSwitches: stub().resolves([]),
     gladys: {
       variable: {
         getValue: stub().resolves(null),
@@ -154,5 +155,85 @@ describe('Create bridge', () => {
     ]);
     expect(homekitHandler.alarmAccessories.get('maison')).to.equal(undefined);
     expect(homekitHandler.publish.callCount).to.equal(1);
+  });
+
+  it('should expose the scene switches between the alarm and the devices', async () => {
+    const sceneSwitch = { id: 'movie-night', name: 'Soirée cinéma', type: 'momentary', initialState: false };
+    const homekitHandler = buildHandler({
+      getSceneSwitches: stub().resolves([sceneSwitch]),
+      buildSceneSwitchAccessory: stub().returns({ UUID: 'scene-movie-night' }),
+    });
+
+    await homekitHandler.createBridge();
+
+    expect(homekitHandler.buildSceneSwitchAccessory.args[0][0]).to.equal(sceneSwitch);
+    expect(homekitHandler.addBridgedAccessories.args[0][0]).to.deep.equal([
+      { UUID: '78a7b724-18e8-4c15-ab30-c8486c253f36' },
+      { UUID: 'scene-movie-night' },
+      { UUID: 'e1b0a9cf-3f6f-4f2e-9f6b-2c0a7f4a1d55' },
+    ]);
+    expect(homekitHandler.sceneSwitchAccessories.get('movie-night')).to.eql({ UUID: 'scene-movie-night' });
+    expect(homekitHandler.publish.callCount).to.equal(1);
+  });
+
+  it('should drop a scene switch that cannot be built and keep the others', async () => {
+    const homekitHandler = buildHandler({
+      getSceneSwitches: stub().resolves([
+        { id: 'broken', name: 'Cassée', type: 'toggle' },
+        { id: 'movie-night', name: 'Soirée cinéma', type: 'momentary' },
+      ]),
+      buildSceneSwitchAccessory: stub()
+        .onFirstCall()
+        .throws(new Error('boom'))
+        .onSecondCall()
+        .returns({ UUID: 'scene-movie-night' }),
+    });
+    const loggerError = stub(logger, 'error');
+
+    try {
+      await homekitHandler.createBridge();
+    } finally {
+      loggerError.restore();
+    }
+
+    expect(loggerError.args[0][0]).to.contain('scene switch broken could not be exposed: boom');
+    expect(homekitHandler.sceneSwitchAccessories.has('broken')).to.equal(false);
+    expect(homekitHandler.sceneSwitchAccessories.get('movie-night')).to.eql({ UUID: 'scene-movie-night' });
+    expect(homekitHandler.addBridgedAccessories.args[0][0]).to.deep.include({ UUID: 'scene-movie-night' });
+    expect(homekitHandler.publish.callCount).to.equal(1);
+  });
+
+  it('should give the room of the bridge to the alarm and the scene switches before the devices', async () => {
+    const sceneSwitches = Array.from({ length: 150 }, (unused, i) => ({
+      id: `scene-${i + 1}`,
+      name: `Scene ${i + 1}`,
+      type: 'momentary',
+      initialState: false,
+    }));
+    const homekitHandler = buildHandler({
+      getSceneSwitches: stub().resolves(sceneSwitches),
+      buildSceneSwitchAccessory: stub().callsFake(({ id }) => ({ UUID: `uuid-${id}` })),
+    });
+    const loggerWarn = stub(logger, 'warn');
+
+    try {
+      await homekitHandler.createBridge();
+    } finally {
+      loggerWarn.restore();
+    }
+
+    // 149 accessories on the bridge: 148 scene switches and the alarm. The device has no room left.
+    const bridged = homekitHandler.addBridgedAccessories.args[0][0];
+    expect(bridged.length).to.equal(149);
+    expect(bridged[bridged.length - 1]).to.eql({ UUID: 'e1b0a9cf-3f6f-4f2e-9f6b-2c0a7f4a1d55' });
+    expect(homekitHandler.sceneSwitchAccessories.size).to.equal(148);
+    expect(homekitHandler.sceneSwitchAccessories.has('scene-148')).to.equal(true);
+    expect(homekitHandler.sceneSwitchAccessories.has('scene-149')).to.equal(false);
+    expect(homekitHandler.alarmAccessories.get('maison')).to.eql({ UUID: 'e1b0a9cf-3f6f-4f2e-9f6b-2c0a7f4a1d55' });
+    // what is left out is named, scene switches included
+    expect(loggerWarn.callCount).to.equal(1);
+    expect(loggerWarn.args[0][0]).to.contain('HomeKit: 152 accessories to expose');
+    expect(loggerWarn.args[0][0]).to.contain('lampe-bureau');
+    expect(loggerWarn.args[0][0]).to.contain('scene switch "Scene 149", scene switch "Scene 150"');
   });
 });

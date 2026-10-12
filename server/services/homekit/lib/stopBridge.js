@@ -1,4 +1,5 @@
 const { EVENTS } = require('../../../utils/constants');
+const { clearSceneSwitchTimers } = require('./buildSceneSwitchAccessory');
 
 /**
  * @description Stop HomeKit bridge.
@@ -11,6 +12,7 @@ async function stopBridge() {
     clearTimeout(this.notifyTimeouts[key].timeout);
   });
   this.notifyTimeouts = {};
+  clearSceneSwitchTimers.call(this);
 
   if (this.notifyCb) {
     this.gladys.event.removeListener(EVENTS.TRIGGERS.CHECK, this.notifyCb);

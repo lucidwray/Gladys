@@ -3,6 +3,7 @@ const sinon = require('sinon').createSandbox();
 
 const { stub } = sinon;
 const { createBridge } = require('../../../../services/homekit/lib/createBridge');
+const { getSceneSwitches } = require('../../../../services/homekit/lib/sceneSwitches');
 const logger = require('../../../../utils/logger');
 const { DEVICE_FEATURE_CATEGORIES, DEVICE_FEATURE_TYPES } = require('../../../../utils/constants');
 
@@ -235,5 +236,43 @@ describe('Create bridge', () => {
     expect(loggerWarn.args[0][0]).to.contain('HomeKit: 152 accessories to expose');
     expect(loggerWarn.args[0][0]).to.contain('lampe-bureau');
     expect(loggerWarn.args[0][0]).to.contain('scene switch "Scene 149", scene switch "Scene 150"');
+  });
+
+  it('should publish the devices and the alarm when the scene switch configuration cannot be read', async () => {
+    const homekitHandler = buildHandler({
+      getSceneSwitches,
+      gladys: {
+        variable: {
+          getValue: stub().callsFake(async (key) =>
+            key === 'HOMEKIT_SCENE_SWITCHES'
+              ? JSON.stringify([{ id: 'movie-night', name: 'Soirée cinéma', type: 'momentary', on_scene_id: 's1' }])
+              : null,
+          ),
+          setValue: stub().resolves(),
+        },
+        scene: {
+          get: stub().rejects(new Error('database is locked')),
+        },
+        event: {
+          on: stub().returns(),
+        },
+      },
+    });
+    const loggerError = stub(logger, 'error');
+
+    try {
+      await homekitHandler.createBridge();
+    } finally {
+      loggerError.restore();
+    }
+
+    expect(loggerError.args[0][0]).to.contain('scene switches could not be read, none will be exposed');
+    expect(loggerError.args[0][0]).to.contain('database is locked');
+    expect(homekitHandler.addBridgedAccessories.args[0][0]).to.deep.members([
+      { UUID: '78a7b724-18e8-4c15-ab30-c8486c253f36' },
+      { UUID: 'e1b0a9cf-3f6f-4f2e-9f6b-2c0a7f4a1d55' },
+    ]);
+    expect(homekitHandler.sceneSwitchAccessories.size).to.equal(0);
+    expect(homekitHandler.publish.callCount).to.equal(1);
   });
 });

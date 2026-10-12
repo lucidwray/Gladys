@@ -29,6 +29,18 @@ async function runScene(gladys, sceneId) {
 }
 
 /**
+ * @description Build the error answered to a Home app request whose scene could not run. HAP shows it as a
+ * communication failure. The scene did not start, so that is what it is.
+ * @param {object} hap - hap-nodejs module.
+ * @returns {object} HAP status error to pass to the callback.
+ * @example
+ * callback(hapCommunicationFailure(hap));
+ */
+function hapCommunicationFailure(hap) {
+  return new hap.HapStatusError(hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+}
+
+/**
  * @description Cancel the momentary switches still waiting to turn back off. Called when the bridge is
  * stopped or reset, so no timer fires on accessories the bridge no longer carries.
  * @example
@@ -75,9 +87,9 @@ function buildSceneSwitchAccessory(sceneSwitch) {
     try {
       await runScene(this.gladys, onSceneId);
     } catch (e) {
-      logger.error(`HomeKit: scene switch ${id} could not run its scene: ${e.message}`);
+      logger.warn(`HomeKit: scene switch ${id} could not run its scene: ${e.message}`);
       // The switch stays as it was: a press that ran nothing must not light the switch up.
-      callback(e);
+      callback(hapCommunicationFailure(this.hap));
       return;
     }
 
@@ -99,7 +111,7 @@ function buildSceneSwitchAccessory(sceneSwitch) {
     callback();
   };
 
-  const setToggle = async (value, callback) => {
+  const applyToggle = async (value, callback) => {
     // Always run the scene for the position asked for, even when the switch already shows it: an explicit
     // "turn on" from the Home app must start the scene, not be swallowed because nothing changed.
     const turnOn = Boolean(value);
@@ -107,14 +119,27 @@ function buildSceneSwitchAccessory(sceneSwitch) {
     try {
       await runScene(this.gladys, turnOn ? onSceneId : offSceneId);
     } catch (e) {
-      logger.error(`HomeKit: scene switch ${id} could not run its scene: ${e.message}`);
-      callback(e);
+      logger.warn(`HomeKit: scene switch ${id} could not run its scene: ${e.message}`);
+      callback(hapCommunicationFailure(this.hap));
       return;
     }
 
     on = turnOn;
     await this.saveSceneSwitchToggleState(id, turnOn);
     callback();
+  };
+
+  // Toggle sets on one switch run one after another. Two overlapping sets would otherwise interleave at
+  // the awaits above, and the state kept in memory and remembered could end on the older value. The chain
+  // never rejects: a callback that throws is logged and the next set still runs.
+  let toggleQueue = Promise.resolve();
+  const setToggle = (value, callback) => {
+    const applied = toggleQueue.then(() => applyToggle(value, callback));
+    toggleQueue = applied.then(
+      () => undefined,
+      (e) => logger.error(`HomeKit: scene switch ${id} could not answer a set: ${e.message}`),
+    );
+    return toggleQueue;
   };
 
   const onCharacteristic = service.getCharacteristic(Characteristic.On);

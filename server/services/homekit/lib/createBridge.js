@@ -76,7 +76,14 @@ async function createBridge() {
   // Scene switches come after the alarms and before the devices: they are what the user set up on
   // purpose, and a device left out costs less than a scene switch they were counting on. Each one is
   // built on its own, so a broken entry is dropped without costing the others.
-  const sceneSwitches = await this.getSceneSwitches();
+  // The configuration is read from the database: a read that fails must cost the scene switches, not the
+  // whole bridge. The devices and the alarms are published all the same.
+  let sceneSwitches = [];
+  try {
+    sceneSwitches = await this.getSceneSwitches();
+  } catch (e) {
+    logger.error(`HomeKit: scene switches could not be read, none will be exposed: ${e.message}`);
+  }
   const builtSceneSwitches = [];
   sceneSwitches.forEach((sceneSwitch) => {
     try {

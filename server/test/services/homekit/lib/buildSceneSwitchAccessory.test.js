@@ -28,6 +28,18 @@ const TOGGLE = {
 };
 
 /**
+ * @description Stand-in for hap-nodejs HapStatusError: an error carrying the HAP status it answers with.
+ * @example
+ * new HapStatusError(-70402);
+ */
+class HapStatusError extends Error {
+  constructor(hapStatus) {
+    super(`HAP status ${hapStatus}`);
+    this.hapStatus = hapStatus;
+  }
+}
+
+/**
  * @description Build the hand-made HAP objects a scene switch touches: one On characteristic whose
  * handlers are kept, one service, and a UUID generator that echoes its seed.
  * @returns {object} The HAP stub and what it recorded.
@@ -54,6 +66,8 @@ function buildHapStub() {
     Characteristic: { On: 'ON' },
     CharacteristicEventTypes: { GET: 'get', SET: 'set' },
     uuid: { generate: stub().callsFake((seed) => `uuid(${seed})`) },
+    HapStatusError,
+    HAPStatus: { SERVICE_COMMUNICATION_FAILURE: -70402 },
   };
 
   return { hap, onHandlers, service, addService };
@@ -200,27 +214,29 @@ describe('Build scene switch accessory', () => {
       const handler = buildHandler();
       buildSceneSwitchAccessory.call(handler, MOMENTARY);
       handler.gladys.scene.get = stub().resolves([]);
-      const loggerError = stub(logger, 'error');
+      const loggerWarn = stub(logger, 'warn');
 
       const error = await setOn(handler.onHandlers, true);
 
-      expect(error.message).to.contain(`scene ${SCENE_ON} does not exist anymore`);
+      expect(error).to.be.an.instanceOf(HapStatusError);
+      expect(error.hapStatus).to.equal(-70402);
       expect(handler.gladys.scene.execute.callCount).to.equal(0);
       expect(await readOn(handler.onHandlers)).to.equal(false);
       expect(handler.sceneSwitchTimeouts.size).to.equal(0);
-      expect(loggerError.args[0][0]).to.contain('scene switch movie-night could not run its scene');
+      expect(loggerWarn.args[0][0]).to.contain('scene switch movie-night could not run its scene');
+      expect(loggerWarn.args[0][0]).to.contain(`scene ${SCENE_ON} does not exist anymore`);
     });
 
     it('should keep a switch that is on, on, when a later press finds its scene gone', async () => {
       const handler = buildHandler();
       buildSceneSwitchAccessory.call(handler, MOMENTARY);
-      stub(logger, 'error');
+      stub(logger, 'warn');
 
       await setOn(handler.onHandlers, true);
       handler.gladys.scene.get = stub().resolves([]);
       const error = await setOn(handler.onHandlers, true);
 
-      expect(error).to.be.an('error');
+      expect(error).to.be.an.instanceOf(HapStatusError);
       expect(await readOn(handler.onHandlers)).to.equal(true);
       clock.tick(MOMENTARY_DURATION_MS);
       expect(handler.service.updateCharacteristic.args).to.deep.equal([['ON', false]]);
@@ -298,19 +314,69 @@ describe('Build scene switch accessory', () => {
       expect(loggerWarn.callCount).to.equal(1);
     });
 
+    it('should end on the last of two overlapping sets, in the state and in the variable', async () => {
+      const handler = buildHandler();
+      buildSceneSwitchAccessory.call(handler, TOGGLE);
+      // The scene lookup of the first set answers last: unserialized, the first set would finish after the
+      // second one and leave the switch on.
+      let answerFirstLookup;
+      handler.gladys.scene.get = stub()
+        .onFirstCall()
+        .returns(
+          new Promise((resolve) => {
+            answerFirstLookup = () => resolve(SCENES);
+          }),
+        )
+        .resolves(SCENES);
+
+      const firstSet = setOn(handler.onHandlers, true);
+      const secondSet = setOn(handler.onHandlers, false);
+      // Let everything that can run run: the second set must wait behind the first one.
+      await new Promise((resolve) => {
+        setImmediate(resolve);
+      });
+      expect(handler.gladys.scene.get.callCount).to.equal(1);
+      expect(handler.gladys.scene.execute.callCount).to.equal(0);
+      answerFirstLookup();
+      await Promise.all([firstSet, secondSet]);
+
+      expect(handler.gladys.scene.execute.args).to.deep.equal([['cinema'], ['lumiere']]);
+      expect(await readOn(handler.onHandlers)).to.equal(false);
+      expect(handler.gladys.variable.setValue.args.map(([, value]) => value)).to.deep.equal(['1', '0']);
+    });
+
+    it('should keep answering the next set when a callback throws', async () => {
+      const handler = buildHandler();
+      buildSceneSwitchAccessory.call(handler, TOGGLE);
+      const loggerError = stub(logger, 'error');
+
+      const thrown = new Promise((resolve) => {
+        handler.onHandlers.set(true, () => {
+          resolve();
+          throw new Error('callback exploded');
+        });
+      });
+      await thrown;
+      await setOn(handler.onHandlers, false);
+
+      expect(await readOn(handler.onHandlers)).to.equal(false);
+      expect(handler.gladys.scene.execute.args).to.deep.equal([['cinema'], ['lumiere']]);
+      expect(loggerError.args[0][0]).to.contain('could not answer a set: callback exploded');
+    });
+
     it('should answer the error and keep its state when the scene no longer exists', async () => {
       const handler = buildHandler({
         gladys: { scene: { get: stub().resolves([]), execute: stub() }, variable: { setValue: stub() } },
       });
       buildSceneSwitchAccessory.call(handler, TOGGLE);
-      const loggerError = stub(logger, 'error');
+      const loggerWarn = stub(logger, 'warn');
 
       const error = await setOn(handler.onHandlers, true);
 
-      expect(error.message).to.contain(`scene ${SCENE_ON} does not exist anymore`);
+      expect(error).to.be.an.instanceOf(HapStatusError);
       expect(await readOn(handler.onHandlers)).to.equal(false);
       expect(handler.gladys.variable.setValue.callCount).to.equal(0);
-      expect(loggerError.args[0][0]).to.contain('scene switch reading-lamp could not run its scene');
+      expect(loggerWarn.args[0][0]).to.contain('scene switch reading-lamp could not run its scene');
     });
   });
 });

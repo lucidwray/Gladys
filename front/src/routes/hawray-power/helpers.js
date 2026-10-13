@@ -1,3 +1,5 @@
+import dayjs from 'dayjs';
+
 // Pure helpers of the Power page: the table rows, the live updates and the remembered choices. No DOM, no request.
 
 export const TABS = ['live', 'min', 'hr', 'day', 'wk', 'mo', 'yr'];
@@ -212,3 +214,114 @@ export const seriesOf = (series, selector) => (series && series[selector]) || []
 export const linesChanged = (previous, next) =>
   previous.length !== next.length ||
   next.some((line, index) => line.name !== previous[index].name || line.points !== previous[index].points);
+
+// The time axis of the stacked rows (spec §6). A label needs about AXIS_LABEL_PX of strip width, so the strip holds at
+// most one label per that many pixels, and the ticks snap to nice boundaries of the visible span.
+export const AXIS_LABEL_PX = 70;
+
+const MINUTE_MS = 60 * 1000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
+const MONTH_MS = 30.44 * DAY_MS;
+
+// The step ladder per span band, smallest first. The first step that fits the width is the one shown; the larger
+// steps are the fallback for a narrow strip. A "clock" step is in minutes of local time, a "day" step in local days, a
+// "month" step in months, all aligned to local boundaries.
+const AXIS_BANDS = [
+  { maxSpan: 30 * MINUTE_MS, unit: 'clock', steps: [1, 2, 5, 10, 15, 30] },
+  { maxSpan: 60 * MINUTE_MS, unit: 'clock', steps: [10, 15, 30, 60] },
+  { maxSpan: 2 * 60 * MINUTE_MS, unit: 'clock', steps: [30, 60, 120] },
+  { maxSpan: 6 * 60 * MINUTE_MS, unit: 'clock', steps: [60, 120, 180, 360] },
+  { maxSpan: DAY_MS, unit: 'clock', steps: [120, 180, 240, 360, 720] },
+  { maxSpan: 7 * DAY_MS, unit: 'day', steps: [1, 2, 3, 7] },
+  { maxSpan: 90 * DAY_MS, unit: 'day', steps: [5, 7, 10, 15, 30] },
+  { maxSpan: Infinity, unit: 'month', steps: [1, 2, 3, 6, 12] }
+];
+
+const stepMsOf = (band, step) => {
+  if (band.unit === 'clock') return step * MINUTE_MS;
+  return band.unit === 'day' ? step * DAY_MS : step * MONTH_MS;
+};
+
+// Local midnights, every `step` days, from the first midnight at or after `start`
+const dayTicks = (start, end, step) => {
+  const first = dayjs(start).startOf('day');
+  const begin = first.valueOf() < start ? first.add(1, 'day') : first;
+  const ticks = [];
+  for (let k = 0; begin.add(k * step, 'day').valueOf() <= end; k += 1) {
+    ticks.push(begin.add(k * step, 'day').valueOf());
+  }
+  return ticks;
+};
+
+// Local month starts whose month number is a multiple of `step`, so the ticks do not move as the window slides
+const monthTicks = (start, end, step) => {
+  let cursor = dayjs(start).startOf('month');
+  if (cursor.valueOf() < start) {
+    cursor = cursor.add(1, 'month');
+  }
+  while ((cursor.year() * 12 + cursor.month()) % step !== 0) {
+    cursor = cursor.add(1, 'month');
+  }
+  const ticks = [];
+  for (let k = 0; cursor.add(k * step, 'month').valueOf() <= end; k += 1) {
+    ticks.push(cursor.add(k * step, 'month').valueOf());
+  }
+  return ticks;
+};
+
+// Local clock times that are multiples of `step` minutes, in the local days that the span touches
+const clockTicks = (start, end, step) => {
+  const firstDay = dayjs(start).startOf('day');
+  const ticks = [];
+  for (let d = 0; firstDay.add(d, 'day').valueOf() <= end; d += 1) {
+    const day = firstDay.add(d, 'day');
+    for (let minute = 0; minute < 24 * 60; minute += step) {
+      const tick = new Date(day.year(), day.month(), day.date(), 0, minute).getTime();
+      if (tick >= start && tick <= end) {
+        ticks.push(tick);
+      }
+    }
+  }
+  return ticks;
+};
+
+const ticksOf = (band, step, start, end) => {
+  if (band.unit === 'day') return dayTicks(start, end, step);
+  if (band.unit === 'month') return monthTicks(start, end, step);
+  return clockTicks(start, end, step);
+};
+
+// The label format follows the span: a day shows the hour, a longer span the day, then the month (from 90 days)
+const formatOf = (spanBand, tick) => {
+  if (spanBand.unit === 'month') return 'MMM YYYY';
+  if (spanBand.unit === 'day') return 'D MMM';
+  // The first tick after a midnight shows the date too
+  const local = dayjs(tick);
+  return local.hour() === 0 && local.minute() === 0 ? 'D MMM HH:mm' : 'HH:mm';
+};
+
+// The ticks of the time axis for the x range [start, end] (ms) on a strip `width` px wide. Returns the tick position
+// as a ratio of the span (0 to 1), its label format and its time (ms). The step is the first in the band's ladder
+// whose ticks fit the width: at most floor(width / AXIS_LABEL_PX) of them, and at least AXIS_LABEL_PX apart.
+export const timeAxisTicks = ({ start, end, width }) => {
+  const span = end - start;
+  if (!(span > 0) || !(width > 0)) {
+    return [];
+  }
+  const maxLabels = Math.max(1, Math.floor(width / AXIS_LABEL_PX));
+  const spanBand = AXIS_BANDS.find(band => span <= band.maxSpan);
+  // The ladder continues into the larger bands when none of this band's steps fits a very narrow strip
+  const candidates = AXIS_BANDS.slice(AXIS_BANDS.indexOf(spanBand)).flatMap(band =>
+    band.steps.map(step => ({ band, step }))
+  );
+  const chosen =
+    candidates.find(({ band: candidateBand, step }) => {
+      const pxPerStep = (width * stepMsOf(candidateBand, step)) / span;
+      return pxPerStep >= AXIS_LABEL_PX && ticksOf(candidateBand, step, start, end).length <= maxLabels;
+    }) || candidates[candidates.length - 1];
+  return ticksOf(chosen.band, chosen.step, start, end).map(tick => ({
+    ratio: (tick - start) / span,
+    format: formatOf(spanBand, tick),
+    time: tick
+  }));
+};

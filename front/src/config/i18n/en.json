@@ -7180,6 +7180,65 @@
     "on": "On",
     "off": "Off"
   },
+  "hawrayPower": {
+    "nav": "Power",
+    "title": "Power",
+    "subtitle": "The power of the house and of each circuit, live and over time",
+    "loading": "Loading the power data…",
+    "error": "The power data could not be loaded.",
+    "retry": "Try again",
+    "table": {
+      "tabs": {
+        "live": "Live",
+        "min": "Min",
+        "hr": "Hr",
+        "day": "Day",
+        "wk": "Wk",
+        "mo": "Mo",
+        "yr": "Yr"
+      },
+      "columns": {
+        "name": "Name",
+        "value": "Value",
+        "share": "Share"
+      },
+      "total": "Total usage",
+      "other": "Other / unmonitored",
+      "plugs": "Plugs",
+      "noMains": "No mains meter detected. Choose the mains device below to see the total.",
+      "liveNote": "Live is the last-minute average, in kW. The other tabs show the kWh of the current period so far.",
+      "periodNote": "kWh since {{start}}"
+    },
+    "chart": {
+      "title": "Mains power",
+      "mains": "Total usage",
+      "rangeLabel": "Chart range",
+      "ranges": {
+        "15m": "15 min",
+        "1h": "1 hour",
+        "6h": "6 hours",
+        "24h": "24 hours",
+        "7d": "7 days",
+        "30d": "30 days",
+        "1y": "1 year"
+      },
+      "overlay": "Overlay",
+      "noMains": "No mains meter detected yet."
+    },
+    "stack": {
+      "title": "Per circuit",
+      "current": "{{value}} W"
+    },
+    "settings": {
+      "title": "Mains meter",
+      "hint": "The total usage is the mains meter. It is detected from the Emporia channels; choose another device here if needed.",
+      "mainsLabel": "Mains device",
+      "auto": "Detected automatically",
+      "save": "Save",
+      "saved": "The mains device is saved.",
+      "error": "The mains device could not be saved."
+    }
+  },
   "hawrayControls": {
     "nav": "Controls",
     "list": {

@@ -51,6 +51,7 @@ import IntegrationPage from '../routes/integration';
 import DevicesListPage from '../routes/devices';
 import ControlsListPage from '../routes/hawray-controls';
 import ControlsDetailPage from '../routes/hawray-controls/ControlsDetailPage';
+import PowerPage from '../routes/hawray-power';
 import HistoryPage from '../routes/history';
 import ChatPage from '../routes/chat';
 import MapPage from '../routes/map';
@@ -445,6 +446,7 @@ const AppRouter = connect(
         <SafeAsyncRoute path="/dashboard/devices" component={DevicesListPage} />
         <SafeAsyncRoute path="/dashboard/controls" component={ControlsListPage} />
         <SafeAsyncRoute path="/dashboard/controls/:deviceSelector" component={ControlsDetailPage} />
+        <SafeAsyncRoute path="/dashboard/power" component={PowerPage} />
         <SafeAsyncRoute path="/dashboard/history" component={HistoryPage} />
         <SafeAsyncRoute path="/dashboard/chat" component={ChatPage} />
         <SafeAsyncRoute path="/dashboard/maps" component={MapPage} />

@@ -1,7 +1,16 @@
 // Time-bucketed power series of the Power page (docs/specs/hawray-power-page.md, section 7.2).
 const db = require('../../models');
 const { BadParameters } = require('../../utils/coreErrors');
-const { MIN_BUCKET_SECONDS, AUTO_BUCKET_STEPS_SECONDS, MAX_POINTS_PER_SERIES, BUCKET_ORIGIN } = require('./constants');
+const {
+  MIN_BUCKET_SECONDS,
+  AUTO_BUCKET_STEPS_SECONDS,
+  MAX_POINTS_PER_SERIES,
+  MAX_BUCKET_SECONDS,
+  MAX_FEATURES_PER_SERIES,
+  MAX_SPAN_MS,
+  BUCKET_ORIGIN,
+} = require('./constants');
+const { isPowerFeature } = require('./roles');
 
 const SERIES_QUERY = (bucketSeconds, placeholders) => `
   SELECT
@@ -72,10 +81,16 @@ function parseFeatures(value, stateManager) {
   if (selectors.length === 0) {
     throw new BadParameters('Invalid features parameter. Must be a non-empty comma-separated list.');
   }
+  if (selectors.length > MAX_FEATURES_PER_SERIES) {
+    throw new BadParameters(`Invalid features parameter. At most ${MAX_FEATURES_PER_SERIES} features per request.`);
+  }
   return selectors.map((selector) => {
     const feature = stateManager.get('deviceFeature', selector);
     if (feature === null) {
       throw new BadParameters(`Unknown device feature selector: ${selector}`);
+    }
+    if (!isPowerFeature(feature)) {
+      throw new BadParameters(`Device feature ${selector} is not a power feature`);
     }
     return feature;
   });
@@ -105,6 +120,9 @@ function resolveBucketSeconds(value, fromMs, toMs) {
   if (!Number.isInteger(bucketSeconds) || bucketSeconds < MIN_BUCKET_SECONDS) {
     throw new BadParameters(`Invalid bucket parameter. Must be an integer of at least ${MIN_BUCKET_SECONDS} seconds.`);
   }
+  if (bucketSeconds > MAX_BUCKET_SECONDS) {
+    throw new BadParameters(`Invalid bucket parameter. Must be at most ${MAX_BUCKET_SECONDS} seconds.`);
+  }
   if (pointCount(fromMs, toMs, bucketSeconds) > MAX_POINTS_PER_SERIES) {
     throw new BadParameters(`Invalid bucket parameter. More than ${MAX_POINTS_PER_SERIES} points per series.`);
   }
@@ -126,6 +144,9 @@ async function getSeries(stateManager, params = {}) {
   const to = parseDateParameter(params.to, 'to');
   if (from.getTime() >= to.getTime()) {
     throw new BadParameters('Invalid from/to parameters. from must be before to.');
+  }
+  if (to.getTime() - from.getTime() > MAX_SPAN_MS) {
+    throw new BadParameters('Invalid from/to parameters. The span must be at most 400 days.');
   }
   const bucketSeconds = resolveBucketSeconds(params.bucket, from.getTime(), to.getTime());
 

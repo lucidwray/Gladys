@@ -53,7 +53,7 @@ describe('hawray power endpoints', () => {
       await authenticatedRequest
         .get('/api/v1/hawray/power/series')
         .query({
-          features: 'test-device-feature',
+          features: POWER_FEATURE,
           from: '2026-10-12T00:00:00.000Z',
           to: '2026-10-12T01:00:00.000Z',
         })
@@ -61,7 +61,7 @@ describe('hawray power endpoints', () => {
         .expect(200)
         .then((res) => {
           expect(res.body).to.have.property('bucket_seconds', 60);
-          expect(res.body.series).to.deep.equal({ 'test-device-feature': [] });
+          expect(res.body.series).to.deep.equal({ [POWER_FEATURE]: [] });
         });
     });
 
@@ -69,7 +69,7 @@ describe('hawray power endpoints', () => {
       await seedNonAdminUser();
       await nonAdminRequest
         .get('/api/v1/hawray/power/series')
-        .query({ features: 'test-device-feature', from: '2026-10-12T00:00:00Z', to: '2026-10-12T01:00:00Z' })
+        .query({ features: POWER_FEATURE, from: '2026-10-12T00:00:00Z', to: '2026-10-12T01:00:00Z' })
         .expect('Content-Type', /json/)
         .expect(200);
     });
@@ -77,15 +77,31 @@ describe('hawray power endpoints', () => {
     it('refuses an unauthenticated user', async () => {
       await request
         .get('/api/v1/hawray/power/series')
-        .query({ features: 'test-device-feature', from: '2026-10-12T00:00:00Z', to: '2026-10-12T01:00:00Z' })
+        .query({ features: POWER_FEATURE, from: '2026-10-12T00:00:00Z', to: '2026-10-12T01:00:00Z' })
         .expect(401);
+    });
+
+    it('answers 400 for an oversized bucket, a non-power feature and a span over 400 days', async () => {
+      await authenticatedRequest
+        .get('/api/v1/hawray/power/series')
+        .query({ features: POWER_FEATURE, from: '2026-01-01T00:00:00Z', to: '2026-12-31T00:00:00Z', bucket: '1e21' })
+        .expect('Content-Type', /json/)
+        .expect(400);
+      await authenticatedRequest
+        .get('/api/v1/hawray/power/series')
+        .query({ features: 'test-device-feature', from: '2026-10-12T00:00:00Z', to: '2026-10-12T01:00:00Z' })
+        .expect(400);
+      await authenticatedRequest
+        .get('/api/v1/hawray/power/series')
+        .query({ features: POWER_FEATURE, from: '2020-01-01T00:00:00Z', to: '2026-10-12T00:00:00Z' })
+        .expect(400);
     });
 
     it('answers 400 BadParameters on an invalid parameter', async () => {
       await authenticatedRequest
         .get('/api/v1/hawray/power/series')
         .query({
-          features: 'test-device-feature',
+          features: POWER_FEATURE,
           from: '2026-10-12T00:00:00Z',
           to: '2026-10-12T01:00:00Z',
           bucket: '30',

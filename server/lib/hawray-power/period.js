@@ -1,7 +1,7 @@
 // Period starts of the Power page summary (docs/specs/hawray-power-page.md, section 4): the start of
 // the current minute, hour, day, week (Monday), month and year in the house timezone, as UTC instants.
 const { SYSTEM_VARIABLE_NAMES, DEFAULT_TIMEZONE } = require('../../utils/constants');
-const { getLocalContext, localToUtcMs, addDays } = require('../energy-contract/tariff.time');
+const { getLocalContext, localToUtcMs, addDays, MS_PER_MINUTE } = require('../energy-contract/tariff.time');
 
 /**
  * @description The house timezone: the TIMEZONE system variable, or DEFAULT_TIMEZONE when unset.
@@ -26,13 +26,18 @@ async function getHouseTimezone(variable) {
  */
 function getPeriodStarts(nowMs, timezone) {
   const local = getLocalContext(nowMs, timezone);
-  const hours = String(Math.floor(local.minutes / 60)).padStart(2, '0');
-  const minutes = String(local.minutes % 60).padStart(2, '0');
+  // min and hr come from the UTC instant: the local clock reads the repeated hour twice on a fall-back
+  // day, so a wall-clock lookup would pick the first pass. Offsets are whole minutes, so the UTC minute
+  // and the local minute match, and the start of the local hour is the instant less the local minute of
+  // the hour and the milliseconds since the minute began.
+  const msIntoMinute = nowMs % MS_PER_MINUTE;
+  const minuteStartMs = nowMs - msIntoMinute;
+  const hourStartMs = minuteStartMs - (local.minutes % 60) * MS_PER_MINUTE;
   // weekday: 0 = Sunday ... 6 = Saturday; Monday is 1, so the Monday of the week is (weekday + 6) % 7 days back
   const mondayOffset = (local.weekday + 6) % 7;
   const starts = {
-    min: localToUtcMs(local.date, timezone, `${hours}:${minutes}`),
-    hr: localToUtcMs(local.date, timezone, `${hours}:00`),
+    min: minuteStartMs,
+    hr: hourStartMs,
     day: localToUtcMs(local.date, timezone),
     wk: localToUtcMs(addDays(local.date, -mondayOffset), timezone),
     mo: localToUtcMs(`${local.year}-${String(local.month).padStart(2, '0')}-01`, timezone),

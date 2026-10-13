@@ -105,6 +105,107 @@ describe('hawray power series', () => {
     });
   });
 
+  describe('limits of the request (security review LOW-1 and LOW-2)', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+
+    it('accepts a bucket up to one year and rejects anything above', () => {
+      expect(resolveBucketSeconds('31536000', 0, 365 * DAY)).to.equal(31536000);
+      expect(() => resolveBucketSeconds('31536001', 0, 365 * DAY)).to.throw(BadParameters, 'at most 31536000');
+      expect(() => resolveBucketSeconds('2147483648', 0, 365 * DAY)).to.throw(BadParameters, 'at most 31536000');
+      expect(() => resolveBucketSeconds('1e21', 0, 365 * DAY)).to.throw(BadParameters, 'at most 31536000');
+    });
+
+    it('rejects an oversized bucket before any SQL runs, with BadParameters', async () => {
+      buildFeatureState(stateManager, 'bucket-cap');
+      const errors = await Promise.all(
+        ['2147483648', '1e21', '9007199254740991'].map((bucket) =>
+          getSeries(stateManager, {
+            features: 'bucket-cap',
+            from: '2026-01-01T00:00:00Z',
+            to: '2026-12-31T00:00:00Z',
+            bucket,
+          }).then(
+            () => null,
+            (error) => error,
+          ),
+        ),
+      );
+      errors.forEach((error) => {
+        expect(error).to.be.instanceOf(BadParameters);
+        expect(error.message).to.include('at most 31536000');
+      });
+    });
+
+    it('accepts up to 64 power features and rejects 65', () => {
+      const sixtyFour = [];
+      for (let i = 0; i < 64; i += 1) {
+        sixtyFour.push(buildFeatureState(stateManager, `many-${i}`).selector);
+      }
+      expect(parseFeatures(sixtyFour.join(','), stateManager)).to.have.lengthOf(64);
+      buildFeatureState(stateManager, 'many-64');
+      expect(() => parseFeatures([...sixtyFour, 'many-64'].join(','), stateManager)).to.throw(
+        BadParameters,
+        'At most 64 features',
+      );
+    });
+
+    it('rejects a feature that is not a power feature', () => {
+      stateManager.setState('deviceFeature', 'not-power', {
+        id: randomUUID(),
+        selector: 'not-power',
+        category: 'light',
+        type: 'binary',
+      });
+      expect(() => parseFeatures('not-power', stateManager)).to.throw(
+        BadParameters,
+        'Device feature not-power is not a power feature',
+      );
+      stateManager.setState('deviceFeature', 'switch-energy', {
+        id: randomUUID(),
+        selector: 'switch-energy',
+        category: 'switch',
+        type: 'energy',
+      });
+      expect(() => parseFeatures('switch-energy', stateManager)).to.throw(BadParameters, 'not a power feature');
+    });
+
+    it('accepts a span of 400 days and rejects a longer one', async () => {
+      buildFeatureState(stateManager, 'span-feature');
+      const result = await getSeries(stateManager, {
+        features: 'span-feature',
+        from: '2026-01-01T00:00:00Z',
+        to: new Date(Date.parse('2026-01-01T00:00:00Z') + 400 * DAY).toISOString(),
+      });
+      expect(result.bucket_seconds).to.equal(43200); // 800 points at 12 h
+      let error;
+      try {
+        await getSeries(stateManager, {
+          features: 'span-feature',
+          from: '2026-01-01T00:00:00Z',
+          to: new Date(Date.parse('2026-01-01T00:00:00Z') + 400 * DAY + 1000).toISOString(),
+        });
+      } catch (e) {
+        error = e;
+      }
+      expect(error).to.be.instanceOf(BadParameters);
+      expect(error.message).to.include('at most 400 days');
+    });
+
+    it('accepts the front request: mains, balance and 15 circuits over one year', async () => {
+      const selectors = [];
+      for (let i = 0; i < 17; i += 1) {
+        selectors.push(buildFeatureState(stateManager, `front-${i}`).selector);
+      }
+      const result = await getSeries(stateManager, {
+        features: selectors.join(','),
+        from: '2026-01-01T00:00:00Z',
+        to: '2027-01-01T00:00:00Z',
+      });
+      expect(Object.keys(result.series)).to.have.lengthOf(17);
+      expect(result.bucket_seconds).to.equal(21600);
+    });
+  });
+
   describe('getSeries', () => {
     it('averages each bucket and omits empty buckets', async () => {
       const feature = buildFeatureState(stateManager, 'series-gaps');

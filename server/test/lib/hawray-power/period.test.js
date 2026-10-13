@@ -72,6 +72,25 @@ describe('hawray power period starts', () => {
       expect(weekStarts.day).to.equal('2026-11-01T04:00:00.000Z'); // midnight of 1 November, before the change at 02:00
     });
 
+    it('starts the minute and the hour from the instant in the repeated hour of a fall-back day', () => {
+      // 2026-11-01 01:00-02:00 happens twice in New York. 06:30Z is 01:30 EST (second pass)
+      const second = getPeriodStarts(Date.parse('2026-11-01T06:30:00Z'), NEW_YORK);
+      expect(second.min).to.equal('2026-11-01T06:30:00.000Z');
+      expect(second.hr).to.equal('2026-11-01T06:00:00.000Z');
+      expect(second.day).to.equal('2026-11-01T04:00:00.000Z'); // local midnight is still EDT
+      // 05:30Z is 01:30 EDT (first pass): the hour started at 05:00Z
+      const first = getPeriodStarts(Date.parse('2026-11-01T05:30:00Z'), NEW_YORK);
+      expect(first.min).to.equal('2026-11-01T05:30:00.000Z');
+      expect(first.hr).to.equal('2026-11-01T05:00:00.000Z');
+    });
+
+    it('keeps the minute and the hour on the UTC grid for a timezone with a half-hour offset', () => {
+      // 2026-10-13 12:37:12Z is 18:07:12 in Asia/Kolkata (UTC+5:30): the hour started at 18:00 local, 12:30Z
+      const starts = getPeriodStarts(Date.parse('2026-10-13T12:37:12Z'), 'Asia/Kolkata');
+      expect(starts.min).to.equal('2026-10-13T12:37:00.000Z');
+      expect(starts.hr).to.equal('2026-10-13T12:30:00.000Z');
+    });
+
     it('starts the year and the month in the house timezone, not in UTC', () => {
       // 2026-01-01 00:30 in New York is still 2026-01-01 05:30 UTC: the year started at 05:00 UTC
       const starts = getPeriodStarts(Date.parse('2026-01-01T05:30:00Z'), NEW_YORK);

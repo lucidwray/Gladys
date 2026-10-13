@@ -13,6 +13,11 @@ const BALANCE_EXTERNAL_ID_SUFFIX = ':balance';
 const MIN_BUCKET_SECONDS = 60;
 const AUTO_BUCKET_STEPS_SECONDS = [60, 300, 600, 900, 1800, 3600, 7200, 21600, 43200, 86400];
 const MAX_POINTS_PER_SERIES = 1500;
+// Request limits of the series API (security review, LOW-1 and LOW-2): the largest bucket is one year,
+// a request names at most 64 power features, and its span is at most 400 days.
+const MAX_BUCKET_SECONDS = 31536000;
+const MAX_FEATURES_PER_SERIES = 64;
+const MAX_SPAN_MS = 400 * 24 * 60 * 60 * 1000;
 
 // The kWh of a period is computed on fixed one-minute buckets (spec section 4): a bucket without
 // samples counts 0, so a bridge outage lowers the kWh instead of being interpolated.
@@ -32,6 +37,9 @@ module.exports = {
   MIN_BUCKET_SECONDS,
   AUTO_BUCKET_STEPS_SECONDS,
   MAX_POINTS_PER_SERIES,
+  MAX_BUCKET_SECONDS,
+  MAX_FEATURES_PER_SERIES,
+  MAX_SPAN_MS,
   KWH_BUCKET_SECONDS,
   WATT_SECONDS_PER_KWH,
   BUCKET_ORIGIN,

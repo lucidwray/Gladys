@@ -268,8 +268,9 @@ disables the purge), purged daily at 04:00 (`server/lib/device/device.purgeState
 - **Front unit tests** (as built): 26 tests of the pure helpers (live append and trimming, refresh timing, stack order,
   time-axis ticks). From `front/`, Node 22.7+ or 24: `node --test src/routes/hawray-power/helpers.test.js`
   (`F:helpers.test.js:1-3`). **Not wired into any npm script; CI does not run them.**
-- **Playwright smoke** in `DEMO_MODE`: 12 checks, 12/12 in the last recorded run (table, tabs, range, best-effort zoom
-  propagation, reload persistence, 390 px layout, live window and zoom across the tick). **The script is not in the
+- **Playwright smoke** in `DEMO_MODE`: 13 checks, 13/13 in the last recorded run (table, tabs, range, best-effort zoom
+  propagation, reload persistence, 390 px layout, live window and zoom across the tick, chart sizes and axis
+  alignment after a tick, and no axis-label overlap at 390 and 1280 px for every range). **The script is not in the
   repo**: it sits in the gitignored `.claude/scratch/` of the author's machine; CI does not run it.
 - In `front/` also `npm run prettier`, `eslint`, `compare-translations` (4 locales), `build` (AGENTS.md).
 

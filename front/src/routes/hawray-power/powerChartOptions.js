@@ -24,6 +24,9 @@ export const POWER_CHART_COLORS = [
 
 const LOCALES = [fr, en, de, es];
 
+// A chart id is a DOM id: the feature selector is kept to the characters that are safe in one
+export const chartIdFor = (prefix, selector) => `${prefix}-${String(selector).replace(/[^A-Za-z0-9_-]/g, '-')}`;
+
 export const buildPowerChartOptions = ({
   chartId,
   height,
@@ -33,7 +36,11 @@ export const buildPowerChartOptions = ({
   zoomable,
   showToolbar,
   compact,
-  showXAxisLabels
+  showXAxisLabels,
+  windowStart,
+  windowEnd,
+  onZoomChange,
+  axisOnly
 }) => ({
   chart: {
     id: chartId,
@@ -42,6 +49,10 @@ export const buildPowerChartOptions = ({
     height,
     fontFamily: 'inherit',
     parentHeightOffset: 0,
+    // A compact row is a sparkline: ApexCharts reserves no axis space, so the plot fills the row (spec §6)
+    sparkline: {
+      enabled: compact && !axisOnly
+    },
     locales: LOCALES,
     defaultLocale: language,
     animations: {
@@ -63,6 +74,14 @@ export const buildPowerChartOptions = ({
     zoom: {
       enabled: zoomable,
       type: 'x'
+    },
+    // The zoom state is shared by the page: a zoom or a reset of any chart tells the page
+    events: {
+      zoomed: (chartContext, options) => {
+        if (onZoomChange) {
+          onZoomChange(chartContext.w.globals.zoomed, options && options.xaxis);
+        }
+      }
     }
   },
   series: lines.map(line => ({ name: line.name, data: toChartPoints(line.points) })),
@@ -70,8 +89,9 @@ export const buildPowerChartOptions = ({
   dataLabels: {
     enabled: false
   },
+  // The axis strip draws no line: it only carries the time labels of the stack
   stroke: {
-    width: 2,
+    width: axisOnly ? 0 : 2,
     lineCap: 'round',
     curve: 'smooth'
   },
@@ -79,16 +99,22 @@ export const buildPowerChartOptions = ({
     size: 0
   },
   grid: {
-    strokeDashArray: 4
+    strokeDashArray: 4,
+    show: !axisOnly && !compact
   },
   xaxis: {
     type: 'datetime',
+    min: windowStart,
+    max: windowEnd,
     labels: {
       show: showXAxisLabels,
       datetimeUTC: false
     },
     axisBorder: {
       show: false
+    },
+    axisTicks: {
+      show: showXAxisLabels
     },
     tooltip: {
       enabled: false
@@ -99,12 +125,12 @@ export const buildPowerChartOptions = ({
     min: 0,
     forceNiceScale: true,
     labels: {
-      show: !compact,
+      show: !compact && !axisOnly,
       formatter: value => `${Math.round(value)}`
     }
   },
   legend: {
-    show: !compact,
+    show: !compact && !axisOnly,
     position: 'bottom'
   },
   tooltip: {
@@ -112,8 +138,7 @@ export const buildPowerChartOptions = ({
   }
 });
 
-// Creates the ApexCharts instance on mount and pushes new series into it; a range change remounts the chart
-// (the caller sets a key), so its zoom starts from the new range.
+// Creates the ApexCharts instance on mount; later data and window changes go through the component
 export const renderPowerChart = (element, options) => {
   const chart = new ApexCharts(element, options);
   chart.render();

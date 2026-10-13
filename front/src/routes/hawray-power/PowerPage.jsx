@@ -6,7 +6,7 @@ import PowerTable from './PowerTable';
 import PowerMainChart from './PowerMainChart';
 import PowerStackedCharts from './PowerStackedCharts';
 import PowerSettings from './PowerSettings';
-import { buildTable, mainsOf, rolesOf, ROLE_CIRCUIT, seriesOf } from './helpers';
+import { buildTable, mainsOf, orderRows, rolesOf, ROLE_CIRCUIT, seriesOf } from './helpers';
 import style from './style.css';
 
 // Layout only: the data and the requests live in ./index.js
@@ -23,6 +23,12 @@ const PowerPage = ({
   devices,
   settingsStatus,
   savingSettings,
+  windowStart,
+  windowEnd,
+  zoomed,
+  zoomRange,
+  stackOrder,
+  onZoomChange,
   onSelectTab,
   onSelectRange,
   onToggleOverlay,
@@ -50,7 +56,7 @@ const PowerPage = ({
     });
 
   // Section C: circuits in the table's order, then Other
-  const stackRows = [...table.circuits];
+  const stackRows = orderRows(table.circuits, stackOrder);
   if (table.other) {
     stackRows.push({ ...table.other, name: intl.dictionary.hawrayPower.table.other });
   }
@@ -106,6 +112,11 @@ const PowerPage = ({
                     loaded={loaded}
                     hasMains={Boolean(mains)}
                     rangeLabel={intl.dictionary.hawrayPower.chart.rangeLabel}
+                    windowStart={windowStart}
+                    windowEnd={windowEnd}
+                    zoomed={zoomed}
+                    zoomRange={zoomRange}
+                    onZoomChange={onZoomChange}
                     onSelectRange={onSelectRange}
                     onToggleOverlay={onToggleOverlay}
                   />
@@ -114,9 +125,13 @@ const PowerPage = ({
                   <PowerStackedCharts
                     rows={stackRows}
                     series={series || {}}
-                    range={range}
                     language={user.language}
                     loaded={loaded && stackRows.length > 0}
+                    windowStart={windowStart}
+                    windowEnd={windowEnd}
+                    zoomed={zoomed}
+                    zoomRange={zoomRange}
+                    onZoomChange={onZoomChange}
                   />
                 </div>
               </div>

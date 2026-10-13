@@ -1,9 +1,17 @@
 import { Text } from 'preact-i18n';
 import cx from 'classnames';
-import dayjs from 'dayjs';
-
 import { TABS, buildTable } from './helpers';
 import style from './style.css';
+
+// The period starts are instants, shown in the house timezone the summary names (spec §4). Intl rather than
+// dayjs.tz: the dayjs instance is shared with the calendar, which must not change zone
+const formatPeriodStart = (instant, zone, language) => {
+  const options = { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' };
+  if (zone) {
+    options.timeZone = zone;
+  }
+  return new Intl.DateTimeFormat(language, options).format(new Date(instant));
+};
 
 const PowerRow = ({ row, showShare, name }) => (
   <tr class={cx(row.muted && 'text-muted')}>
@@ -55,7 +63,7 @@ const PowerTable = ({ summary, tab, user, onSelectTab }) => {
           </thead>
           <tbody>
             {table.total && (
-              <tr class="font-weight-bold">
+              <tr class={cx('font-weight-bold', table.total.muted && 'text-muted')}>
                 <td>
                   <Text id="hawrayPower.table.total" />
                 </td>
@@ -90,11 +98,7 @@ const PowerTable = ({ summary, tab, user, onSelectTab }) => {
             <Text
               id="hawrayPower.table.periodNote"
               fields={{
-                start: periodStart
-                  ? dayjs(periodStart)
-                      .locale(user.language)
-                      .format('LLL')
-                  : '—'
+                start: periodStart ? formatPeriodStart(periodStart, summary.timezone, user.language) : '—'
               }}
             />
           )}

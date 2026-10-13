@@ -15,6 +15,11 @@ const PowerMainChart = ({
   loaded,
   hasMains,
   rangeLabel,
+  windowStart,
+  windowEnd,
+  zoomed,
+  zoomRange,
+  onZoomChange,
   onSelectRange,
   onToggleOverlay
 }) => (
@@ -53,6 +58,11 @@ const PowerMainChart = ({
             showToolbar
             compact={false}
             showXAxisLabels
+            windowStart={windowStart}
+            windowEnd={windowEnd}
+            zoomed={zoomed}
+            zoomRange={zoomRange}
+            onZoomChange={onZoomChange}
           />
         </div>
       )}

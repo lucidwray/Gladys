@@ -11,15 +11,21 @@ import {
   chartSelectors,
   DEFAULT_RANGE,
   DEFAULT_TAB,
+  isCoarseBucket,
   isDisplayedSelector,
   RANGE_STORAGE_KEY,
   RANGES,
   readStoredChoice,
   rangeWindow,
+  refreshDueMs,
+  stackOrderOf,
   storeChoice,
   SUMMARY_REFRESH_MS,
   TAB_STORAGE_KEY,
-  TABS
+  TABS,
+  trimSeries,
+  WINDOW_TICK_MS,
+  windowStartOf
 } from './helpers';
 
 const POWER_DEVICE_FEATURE_TYPE = 'power';
@@ -39,12 +45,20 @@ class Power extends Component {
         DEFAULT_RANGE
       ),
       overlay: [],
+      // The window of the charts ends at `now`; it moves on with each live sample and each tick
+      now: Date.now(),
+      zoomed: false,
+      zoomRange: null,
+      bucketSeconds: null,
+      // The order of the stacked charts, fixed at each summary fetch so that live values do not reorder them
+      stackOrder: [],
       status: RequestStatus.Getting,
       seriesStatus: RequestStatus.Getting,
       settingsStatus: null,
       savingSettings: false
     };
     this.summaryFetchedAt = 0;
+    this.seriesFetchedAt = 0;
     this.wasDisconnected = false;
   }
 
@@ -58,7 +72,7 @@ class Power extends Component {
       this.summaryFetchedAt = Date.now();
       // A tab clicked meanwhile wins over this answer
       if (this.state.tab === tab) {
-        this.setState({ summary, status: RequestStatus.Success });
+        this.setState({ summary, stackOrder: stackOrderOf(summary, tab), status: RequestStatus.Success });
       }
       return summary;
     } catch (e) {
@@ -82,7 +96,12 @@ class Power extends Component {
       });
       // A range picked meanwhile wins over this answer
       if (this.state.range === range) {
-        this.setState({ series: response.series, seriesStatus: RequestStatus.Success });
+        this.seriesFetchedAt = Date.now();
+        this.setState({
+          series: response.series,
+          bucketSeconds: response.bucket_seconds,
+          seriesStatus: RequestStatus.Success
+        });
       }
     } catch (e) {
       console.error(e);
@@ -129,9 +148,11 @@ class Power extends Component {
     if (!isDisplayedSelector(this.state.summary, payload.device_feature_selector)) {
       return;
     }
+    const now = Date.now();
     this.setState(prevState => ({
+      now,
       summary: applyLiveValue(prevState.summary, payload),
-      series: appendSeriesPoint(prevState.series, payload)
+      series: appendSeriesPoint(prevState.series, payload, windowStartOf(now, prevState.range), prevState.bucketSeconds)
     }));
     if (this.state.tab !== 'live' && Date.now() - this.summaryFetchedAt >= SUMMARY_REFRESH_MS) {
       this.getSummary();
@@ -144,11 +165,36 @@ class Power extends Component {
     this.getSummary(tab);
   };
 
-  // The series are cleared so that the charts of the new range are drawn anew
+  // The series are cleared so that the charts of the new range are drawn anew, and a zoom of the old range is dropped
   selectRange = range => {
     storeChoice(RANGE_STORAGE_KEY, range);
-    this.setState({ range, series: null });
+    this.setState({ range, series: null, zoomed: false, zoomRange: null, now: Date.now() });
     this.getSeries(this.state.summary, range);
+  };
+
+  // A zoom of any chart (or its reset) reaches here: while the user is zoomed, the window is not pinned
+  handleZoomChange = (zoomed, xaxis) => {
+    const zoomRange = zoomed && xaxis ? { min: xaxis.min, max: xaxis.max } : null;
+    this.setState({ zoomed, zoomRange });
+  };
+
+  // Every minute: the window moves on, the points that left it are dropped, and a coarse series is refetched
+  // when it is due (spec §8, bucket coarser than the sample interval)
+  tick = () => {
+    const now = Date.now();
+    this.setState(prevState => ({
+      now,
+      series: trimSeries(prevState.series, windowStartOf(now, prevState.range))
+    }));
+    const { bucketSeconds, series } = this.state;
+    if (
+      series &&
+      bucketSeconds &&
+      isCoarseBucket(bucketSeconds) &&
+      now - this.seriesFetchedAt >= refreshDueMs(bucketSeconds)
+    ) {
+      this.getSeries();
+    }
   };
 
   toggleOverlay = selector => {
@@ -174,6 +220,7 @@ class Power extends Component {
   };
 
   componentDidMount() {
+    this.ticker = setInterval(this.tick, WINDOW_TICK_MS);
     this.getDevices();
     this.load();
     this.props.session.dispatcher.addListener(WEBSOCKET_MESSAGE_TYPES.DEVICE.NEW_STATE, this.handleNewState);
@@ -181,6 +228,7 @@ class Power extends Component {
   }
 
   componentWillUnmount() {
+    clearInterval(this.ticker);
     this.props.session.dispatcher.removeListener(WEBSOCKET_MESSAGE_TYPES.DEVICE.NEW_STATE, this.handleNewState);
     this.props.session.dispatcher.removeListener('websocket.connected', this.handleWebsocketConnected);
   }
@@ -205,6 +253,12 @@ class Power extends Component {
         onToggleOverlay={this.toggleOverlay}
         onSaveMains={this.saveMains}
         onRetry={this.retry}
+        windowStart={windowStartOf(state.now, state.range)}
+        windowEnd={state.now}
+        zoomed={state.zoomed}
+        zoomRange={state.zoomRange}
+        stackOrder={state.stackOrder}
+        onZoomChange={this.handleZoomChange}
       />
     );
   }

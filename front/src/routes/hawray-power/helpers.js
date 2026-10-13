@@ -138,17 +138,66 @@ export const applyLiveValue = (summary, payload) => {
 export const isDisplayedSelector = (summary, selector) =>
   Boolean(summary && summary.roles && summary.roles.some(r => r.power_feature_selector === selector));
 
-// Live update of the charts: the raw sample is pushed at the right edge until the next series fetch (spec §8)
-export const appendSeriesPoint = (series, payload) => {
+// The live samples come once a minute (spec §9): a bucket coarser than that is not extended with raw samples
+export const LIVE_SAMPLE_SECONDS = 60;
+// A coarse series is refetched about once per bucket, but at most this often
+export const MAX_REFRESH_SECONDS = 15 * 60;
+// The charts keep their window on the last 'range' minutes, moved on at this pace when nothing arrives
+export const WINDOW_TICK_MS = 60 * 1000;
+
+export const windowStartOf = (nowMs, rangeKey) => nowMs - findRange(rangeKey).minutes * 60 * 1000;
+
+export const isCoarseBucket = bucketSeconds => bucketSeconds > LIVE_SAMPLE_SECONDS;
+
+export const refreshDueMs = bucketSeconds => Math.min(bucketSeconds, MAX_REFRESH_SECONDS) * 1000;
+
+// Points older than the window start are dropped; the same array comes back when nothing is older
+export const trimPoints = (points, windowStartMs) => {
+  if (!points || points.length === 0) {
+    return points;
+  }
+  const first = points.findIndex(point => Date.parse(point.t) >= windowStartMs);
+  if (first === 0) {
+    return points;
+  }
+  return first === -1 ? [] : points.slice(first);
+};
+
+// The same map back when no series had a point to drop, so the charts it feeds are not redrawn
+export const trimSeries = (series, windowStartMs) => {
+  if (!series) {
+    return series;
+  }
+  let changed = false;
+  const trimmed = {};
+  Object.keys(series).forEach(selector => {
+    trimmed[selector] = trimPoints(series[selector], windowStartMs);
+    changed = changed || trimmed[selector] !== series[selector];
+  });
+  return changed ? trimmed : series;
+};
+
+// Live update of the charts (spec §8): the raw sample is pushed at the right edge, and the points that left the
+// window are dropped. A coarse bucket gets no raw sample: its series is refetched instead.
+export const appendSeriesPoint = (series, payload, windowStartMs, bucketSeconds) => {
   const selector = payload.device_feature_selector;
-  if (!series || !Object.prototype.hasOwnProperty.call(series, selector)) {
+  if (!series || !Object.prototype.hasOwnProperty.call(series, selector) || isCoarseBucket(bucketSeconds)) {
     return series;
   }
   const point = {
     t: payload.last_value_changed || new Date().toISOString(),
     avg_w: payload.last_value
   };
-  return { ...series, [selector]: [...series[selector], point] };
+  return { ...series, [selector]: [...trimPoints(series[selector], windowStartMs), point] };
+};
+
+// The circuits in the order of a summary fetch: the stacked charts keep it while live values change
+export const stackOrderOf = (summary, tab) => buildTable(summary, tab).circuits.map(row => row.selector);
+
+// Rows in a given order; a row not in the order goes last, in the order it came
+export const orderRows = (rows, order) => {
+  const rank = selector => (order.includes(selector) ? order.indexOf(selector) : order.length);
+  return rows.slice().sort((a, b) => rank(a.selector) - rank(b.selector));
 };
 
 // ApexCharts data: [epoch ms, W], clamped at 0 (spec §4)

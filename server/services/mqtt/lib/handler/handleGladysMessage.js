@@ -1,6 +1,7 @@
 const { EVENTS } = require('../../../../utils/constants');
 const { BadParameters } = require('../../../../utils/coreErrors');
 const logger = require('../../../../utils/logger');
+const { keepUserFieldsOfExistingDevice } = require('./hawrayKeepUserFields');
 
 /**
  * @description Handle a new message receive in MQTT.
@@ -12,7 +13,9 @@ const logger = require('../../../../utils/logger');
 function handleGladysMessage(topic, message) {
   const parsedTopic = topic.split('/');
   if (topic === 'gladys/master/device/create') {
-    this.gladys.event.emit(EVENTS.DEVICE.NEW, JSON.parse(message));
+    // fork-only (hawray): keep the name and room of an existing device, see hawrayKeepUserFields.js
+    const device = keepUserFieldsOfExistingDevice(this.gladys.stateManager, JSON.parse(message));
+    this.gladys.event.emit(EVENTS.DEVICE.NEW, device);
   } else if (topic.startsWith('gladys/master/device/')) {
     if (!parsedTopic[5]) {
       throw new BadParameters('Device feature external_id is required');

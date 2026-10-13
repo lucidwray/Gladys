@@ -44,8 +44,17 @@
   background: rgba(0, 0, 0, 0.04);
 }
 
-/* The time axis under the stacked rows: the axis strip of the chart group, aligned with the rows above */
+/* The labels of the time axis sit in the box of the rows' plots: the same width, so they line up with the lines */
 .timeAxis {
-  min-width: 0;
+  position: relative;
+  height: 1.25rem;
   margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.timeTick {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
 }

@@ -91,6 +91,7 @@ test('the window ends at now and spans the range', () => {
 test('a coarse series is refetched about once per bucket, at most every 15 minutes', () => {
   assert.equal(refreshDueMs(600), 600 * 1000);
   assert.equal(refreshDueMs(21600), 15 * 60 * 1000);
+  assert.equal(refreshDueMs(60), 15 * 60 * 1000, 'a 60 s series is refetched every 15 minutes too');
 });
 
 const summary = {

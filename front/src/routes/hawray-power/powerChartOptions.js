@@ -6,7 +6,9 @@ import es from 'apexcharts/dist/locales/es.json';
 
 import { toChartPoints } from './helpers';
 
-// Every Power chart joins this group: zooming one zooms them all (spec §6). The shared line options of
+// The stacked rows and their time axis strip share this group: zooming one zooms them all (spec §6). The mains
+// chart is not in it: it is a different height, and its zoom reaches the stack through the page state instead
+// (ApexCharts' group sync copies the height of one chart to all of them). The shared line options of
 // components/boxs/chart are not used: they hide the toolbar and do not set a group, so these are built here.
 export const POWER_CHART_GROUP = 'hawray-power';
 
@@ -40,18 +42,18 @@ export const buildPowerChartOptions = ({
   windowStart,
   windowEnd,
   onZoomChange,
-  axisOnly
+  grouped
 }) => ({
   chart: {
     id: chartId,
-    group: POWER_CHART_GROUP,
+    group: grouped ? POWER_CHART_GROUP : undefined,
     type: 'line',
     height,
     fontFamily: 'inherit',
     parentHeightOffset: 0,
     // A compact row is a sparkline: ApexCharts reserves no axis space, so the plot fills the row (spec §6)
     sparkline: {
-      enabled: compact && !axisOnly
+      enabled: compact
     },
     locales: LOCALES,
     defaultLocale: language,
@@ -89,9 +91,8 @@ export const buildPowerChartOptions = ({
   dataLabels: {
     enabled: false
   },
-  // The axis strip draws no line: it only carries the time labels of the stack
   stroke: {
-    width: axisOnly ? 0 : 2,
+    width: 2,
     lineCap: 'round',
     curve: 'smooth'
   },
@@ -100,7 +101,7 @@ export const buildPowerChartOptions = ({
   },
   grid: {
     strokeDashArray: 4,
-    show: !axisOnly && !compact
+    show: !compact
   },
   xaxis: {
     type: 'datetime',
@@ -125,12 +126,12 @@ export const buildPowerChartOptions = ({
     min: 0,
     forceNiceScale: true,
     labels: {
-      show: !compact && !axisOnly,
+      show: !compact,
       formatter: value => `${Math.round(value)}`
     }
   },
   legend: {
-    show: !compact && !axisOnly,
+    show: !compact,
     position: 'bottom'
   },
   tooltip: {

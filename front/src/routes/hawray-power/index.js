@@ -11,7 +11,6 @@ import {
   chartSelectors,
   DEFAULT_RANGE,
   DEFAULT_TAB,
-  isCoarseBucket,
   isDisplayedSelector,
   RANGE_STORAGE_KEY,
   RANGES,
@@ -178,8 +177,8 @@ class Power extends Component {
     this.setState({ zoomed, zoomRange });
   };
 
-  // Every minute: the window moves on, the points that left it are dropped, and a coarse series is refetched
-  // when it is due (spec §8, bucket coarser than the sample interval)
+  // Every minute: the window moves on, the points that left it are dropped, and a series is refetched
+  // when it is due: about once per bucket for a coarse bucket, and at least every 15 minutes (spec §8)
   tick = () => {
     const now = Date.now();
     this.setState(prevState => ({
@@ -187,12 +186,7 @@ class Power extends Component {
       series: trimSeries(prevState.series, windowStartOf(now, prevState.range))
     }));
     const { bucketSeconds, series } = this.state;
-    if (
-      series &&
-      bucketSeconds &&
-      isCoarseBucket(bucketSeconds) &&
-      now - this.seriesFetchedAt >= refreshDueMs(bucketSeconds)
-    ) {
+    if (series && bucketSeconds && now - this.seriesFetchedAt >= refreshDueMs(bucketSeconds)) {
       this.getSeries();
     }
   };

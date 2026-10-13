@@ -149,7 +149,10 @@ export const windowStartOf = (nowMs, rangeKey) => nowMs - findRange(rangeKey).mi
 
 export const isCoarseBucket = bucketSeconds => bucketSeconds > LIVE_SAMPLE_SECONDS;
 
-export const refreshDueMs = bucketSeconds => Math.min(bucketSeconds, MAX_REFRESH_SECONDS) * 1000;
+// A coarse series is refetched about once per bucket; every series is refetched at least every 15 minutes, which
+// corrects the drift of missed websocket events (the 60 s series are otherwise never refetched)
+export const refreshDueMs = bucketSeconds =>
+  (isCoarseBucket(bucketSeconds) ? Math.min(bucketSeconds, MAX_REFRESH_SECONDS) : MAX_REFRESH_SECONDS) * 1000;
 
 // Points older than the window start are dropped; the same array comes back when nothing is older
 export const trimPoints = (points, windowStartMs) => {

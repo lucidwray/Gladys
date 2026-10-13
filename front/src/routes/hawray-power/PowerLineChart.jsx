@@ -15,7 +15,7 @@ class PowerLineChart extends Component {
   chartRef = createRef();
 
   componentDidMount() {
-    const { lines, language, zoomable, showToolbar, compact, axisOnly } = this.props;
+    const { lines, language, zoomable, showToolbar, compact, grouped } = this.props;
     this.chart = renderPowerChart(
       this.chartRef.current,
       buildPowerChartOptions({
@@ -28,7 +28,7 @@ class PowerLineChart extends Component {
         zoomable,
         showToolbar,
         compact,
-        axisOnly
+        grouped
       })
     );
   }
@@ -60,7 +60,8 @@ class PowerLineChart extends Component {
     if (linesDiffer) {
       update.series = props.lines.map(line => ({ name: line.name, data: toChartPoints(line.points) }));
     }
-    this.chart.updateOptions(update, false, false);
+    // The fourth argument is updateSyncedCharts: false, so this chart's height and axis labels stay its own
+    this.chart.updateOptions(update, false, false, false);
   }
 
   componentWillUnmount() {

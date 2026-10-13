@@ -7180,6 +7180,65 @@
     "on": "Encendido",
     "off": "Apagado"
   },
+  "hawrayPower": {
+    "nav": "Energía",
+    "title": "Energía",
+    "subtitle": "La potencia de la casa y de cada circuito, en vivo y a lo largo del tiempo",
+    "loading": "Cargando los datos de energía…",
+    "error": "No se pudieron cargar los datos de energía.",
+    "retry": "Intentar de nuevo",
+    "table": {
+      "tabs": {
+        "live": "En vivo",
+        "min": "Min",
+        "hr": "Hr",
+        "day": "Día",
+        "wk": "Sem",
+        "mo": "Mes",
+        "yr": "Año"
+      },
+      "columns": {
+        "name": "Nombre",
+        "value": "Valor",
+        "share": "Parte"
+      },
+      "total": "Consumo total",
+      "other": "Otros / no medido",
+      "plugs": "Enchufes",
+      "noMains": "No se detectó el medidor general. Elige abajo el dispositivo del medidor general para ver el total.",
+      "liveNote": "En vivo es la media del último minuto, en kW. Las demás pestañas muestran los kWh del periodo actual hasta ahora.",
+      "periodNote": "kWh desde {{start}}"
+    },
+    "chart": {
+      "title": "Potencia general",
+      "mains": "Consumo total",
+      "rangeLabel": "Rango del gráfico",
+      "ranges": {
+        "15m": "15 min",
+        "1h": "1 h",
+        "6h": "6 h",
+        "24h": "24 h",
+        "7d": "7 días",
+        "30d": "30 días",
+        "1y": "1 año"
+      },
+      "overlay": "Superponer",
+      "noMains": "Aún no se detectó el medidor general."
+    },
+    "stack": {
+      "title": "Por circuito",
+      "current": "{{value}} W"
+    },
+    "settings": {
+      "title": "Medidor general",
+      "hint": "El consumo total es el medidor general. Se detecta automáticamente desde los canales de Emporia; elige aquí otro dispositivo si hace falta.",
+      "mainsLabel": "Dispositivo del medidor general",
+      "auto": "Detección automática",
+      "save": "Guardar",
+      "saved": "El dispositivo del medidor general se ha guardado.",
+      "error": "No se pudo guardar el dispositivo del medidor general."
+    }
+  },
   "hawrayControls": {
     "nav": "Controles",
     "list": {

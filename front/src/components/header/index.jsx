@@ -40,6 +40,7 @@ const NON_DASHBOARD_SECTIONS = [
   'chat',
   'devices',
   'controls',
+  'power',
   'integration',
   'calendar',
   'maps',
@@ -86,6 +87,12 @@ const NAV_ITEMS = [
     icon: 'sliders',
     labelKey: 'hawrayControls.nav',
     isActive: url => url.startsWith('/dashboard/controls')
+  },
+  {
+    href: '/dashboard/power',
+    icon: 'zap',
+    labelKey: 'hawrayPower.nav',
+    isActive: url => url.startsWith('/dashboard/power')
   },
   {
     href: '/dashboard/integration',

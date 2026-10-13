@@ -269,17 +269,30 @@ const monthTicks = (start, end, step) => {
   return ticks;
 };
 
-// Local clock times that are multiples of `step` minutes, in the local days that the span touches
+// The first instant at or after `from` whose local clock time is a multiple of `step` minutes. It walks real minutes,
+// so a clock time that the local calendar skips (02:xx on the spring-forward day) is never picked
+const clockBoundaryFrom = (from, step) => {
+  const clockMinutes = instant => dayjs(instant).hour() * 60 + dayjs(instant).minute();
+  let instant = Math.ceil(from / MINUTE_MS) * MINUTE_MS;
+  while (clockMinutes(instant) % step !== 0) {
+    instant += MINUTE_MS;
+  }
+  return instant;
+};
+
+// Clock ticks every `step` minutes of local time. The first is the first local boundary at or after the span start,
+// and the next ones are `step` minutes of real elapsed time apart: a skipped hour is not listed, and a repeated hour is
+// listed twice, each time with its own instant. A span under a minute with no minute boundary in it keeps one label,
+// on the whole second nearest its middle
 const clockTicks = (start, end, step) => {
-  const firstDay = dayjs(start).startOf('day');
   const ticks = [];
-  for (let d = 0; firstDay.add(d, 'day').valueOf() <= end; d += 1) {
-    const day = firstDay.add(d, 'day');
-    for (let minute = 0; minute < 24 * 60; minute += step) {
-      const tick = new Date(day.year(), day.month(), day.date(), 0, minute).getTime();
-      if (tick >= start && tick <= end) {
-        ticks.push(tick);
-      }
+  for (let tick = clockBoundaryFrom(start, step); tick <= end; tick += step * MINUTE_MS) {
+    ticks.push(tick);
+  }
+  if (ticks.length === 0 && end - start < MINUTE_MS) {
+    const second = Math.round((start + end) / 2000) * 1000;
+    if (second >= start && second <= end) {
+      ticks.push(second);
     }
   }
   return ticks;
@@ -319,7 +332,16 @@ export const timeAxisTicks = ({ start, end, width }) => {
       const pxPerStep = (width * stepMsOf(candidateBand, step)) / span;
       return pxPerStep >= AXIS_LABEL_PX && ticksOf(candidateBand, step, start, end).length <= maxLabels;
     }) || candidates[candidates.length - 1];
-  return ticksOf(chosen.band, chosen.step, start, end).map(tick => ({
+  // The final list keeps each instant once, and drops a tick that sits closer than AXIS_LABEL_PX to the one kept before
+  // it. A day or a month is not always the same real length, so its nominal step can fall short by a few pixels
+  const spaced = [];
+  ticksOf(chosen.band, chosen.step, start, end).forEach(tick => {
+    const last = spaced[spaced.length - 1];
+    if (last === undefined || ((tick - last) * width) / span >= AXIS_LABEL_PX) {
+      spaced.push(tick);
+    }
+  });
+  return spaced.map(tick => ({
     ratio: (tick - start) / span,
     format: formatOf(spanBand, tick),
     time: tick

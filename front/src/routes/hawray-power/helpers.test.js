@@ -300,3 +300,123 @@ test('the 7 d day ticks stay one per local midnight across the New York DST chan
     assert.equal(ticks[2].time - ticks[1].time, 24 * HOUR);
   });
 });
+
+// The DST axes: every tick is its own instant, the ticks are at least 70 px apart on the strip, no tick falls in the
+// 02:xx hour of the spring-forward day, and the labels are the expected local times
+const assertDstAxis = (ticks, span, width, labels) => {
+  const times = timesOf(ticks);
+  assert.equal(new Set(times).size, times.length);
+  for (let i = 1; i < times.length; i += 1) {
+    assert.ok(((times[i] - times[i - 1]) * width) / span >= 70, `ticks ${i} and ${i + 1} are at least 70 px apart`);
+  }
+  assert.ok(times.every(time => dayjs(time).hour() !== 2));
+  assert.deepEqual(
+    ticks.map(tick => dayjs(tick.time).format(tick.format)),
+    labels
+  );
+};
+
+test('the spring-forward 1 h span at 316 px steps 30 min in real time and skips 02:xx', () => {
+  withTimeZone('America/New_York', () => {
+    // 01:30 EST to 03:30 EDT is one real hour: the clocks go from 01:59 to 03:00
+    const start = dayjs('2026-03-08T01:30:00').valueOf();
+    const ticks = timeAxisTicks({ start, end: start + HOUR, width: WIDTH_390 });
+    assertDstAxis(ticks, HOUR, WIDTH_390, ['01:30', '03:00', '03:30']);
+  });
+});
+
+test('the spring-forward 1 h span at 966 px steps 10 min in real time: 01:50 is followed by 03:00', () => {
+  withTimeZone('America/New_York', () => {
+    const start = dayjs('2026-03-08T01:30:00').valueOf();
+    const ticks = timeAxisTicks({ start, end: start + HOUR, width: WIDTH_1280 });
+    assertDstAxis(ticks, HOUR, WIDTH_1280, ['01:30', '01:40', '01:50', '03:00', '03:10', '03:20', '03:30']);
+  });
+});
+
+test('the spring-forward 6 h span at 966 px steps every hour in real time and skips 02:xx', () => {
+  withTimeZone('America/New_York', () => {
+    // 00:30 EST to 07:30 EDT
+    const start = dayjs('2026-03-08T00:30:00').valueOf();
+    const ticks = timeAxisTicks({ start, end: start + 6 * HOUR, width: WIDTH_1280 });
+    assertDstAxis(ticks, 6 * HOUR, WIDTH_1280, ['01:00', '03:00', '04:00', '05:00', '06:00', '07:00']);
+  });
+});
+
+test('the spring-forward 24 h span at 1200 px steps every 2 h in real time and skips 02:xx', () => {
+  withTimeZone('America/New_York', () => {
+    const start = dayjs('2026-03-07T12:00:00').valueOf();
+    const ticks = timeAxisTicks({ start, end: start + DAY, width: 1200 });
+    assertDstAxis(ticks, DAY, 1200, [
+      '12:00',
+      '14:00',
+      '16:00',
+      '18:00',
+      '20:00',
+      '22:00',
+      '8 Mar 00:00',
+      '03:00',
+      '05:00',
+      '07:00',
+      '09:00',
+      '11:00',
+      '13:00'
+    ]);
+  });
+});
+
+test('the fall-back 1 h span at 966 px lists the repeated 01:xx hour twice, with distinct instants', () => {
+  withTimeZone('America/New_York', () => {
+    // 01:30 EDT to 01:30 EST: the hour from 01:30 to 02:30 happens twice, and the span covers the repeat
+    const start = Date.parse('2026-11-01T05:30:00Z');
+    const ticks = timeAxisTicks({ start, end: start + HOUR, width: WIDTH_1280 });
+    assert.deepEqual(
+      timesOf(ticks).map(time => time - start),
+      [0, 10, 20, 30, 40, 50, 60].map(min => min * MINUTE)
+    );
+    assertDstAxis(ticks, HOUR, WIDTH_1280, ['01:30', '01:40', '01:50', '01:00', '01:10', '01:20', '01:30']);
+  });
+});
+
+test('the fall-back 24 h span at 1200 px steps every 2 h in real time and labels the repeated hour', () => {
+  withTimeZone('America/New_York', () => {
+    const start = dayjs('2026-10-31T12:00:00').valueOf();
+    const ticks = timeAxisTicks({ start, end: start + DAY, width: 1200 });
+    assertDstAxis(ticks, DAY, 1200, [
+      '12:00',
+      '14:00',
+      '16:00',
+      '18:00',
+      '20:00',
+      '22:00',
+      '1 Nov 00:00',
+      '01:00',
+      '03:00',
+      '05:00',
+      '07:00',
+      '09:00',
+      '11:00'
+    ]);
+  });
+});
+
+test('a 30 s zoom keeps one label: the whole second nearest its middle, or the minute boundary inside it', () => {
+  // 14:37:10 to 14:37:40 holds no minute boundary, so the label sits at 14:37:25
+  const start = new Date(2026, 9, 13, 14, 37, 10).getTime();
+  const quiet = timeAxisTicks({ start, end: start + 30 * 1000, width: WIDTH_1280 });
+  assert.deepEqual(timesOf(quiet), [new Date(2026, 9, 13, 14, 37, 25).getTime()]);
+  assert.equal(quiet[0].format, 'HH:mm');
+  // 14:37:50 to 14:38:20 holds the 14:38 boundary, which is the label
+  const later = new Date(2026, 9, 13, 14, 37, 50).getTime();
+  const boundary = timeAxisTicks({ start: later, end: later + 30 * 1000, width: WIDTH_1280 });
+  assert.deepEqual(timesOf(boundary), [new Date(2026, 9, 13, 14, 38).getTime()]);
+});
+
+test('the 7 d midnights at 500 px drop the one 23 h after 8 Mar, which would sit 68 px from its neighbour', () => {
+  withTimeZone('America/New_York', () => {
+    // The midnight of 9 Mar is 23 h after 8 Mar, so its gap is 68 px, under the 70 px rule: it is dropped
+    const start = dayjs('2026-03-05T12:30:00').valueOf();
+    const end = dayjs('2026-03-12T12:30:00').valueOf();
+    const ticks = timeAxisTicks({ start, end, width: 500 });
+    assertDstAxis(ticks, end - start, 500, ['6 Mar', '7 Mar', '8 Mar', '10 Mar', '11 Mar', '12 Mar']);
+  });
+});

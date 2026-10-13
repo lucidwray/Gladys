@@ -54,25 +54,19 @@ const sampleEveryMinute = (featureId, fromMs, toMs, value) => {
   return db.duckDbBatchInsertState(featureId, samples);
 };
 
-const roleSelectors = (summary) => ({
-  mains: summary.roles.mains && summary.roles.mains.power_feature_selector,
-  balance: summary.roles.balance && summary.roles.balance.power_feature_selector,
-  circuits: summary.roles.circuits.map((role) => role.power_feature_selector),
-  plugs: summary.roles.plugs.map((role) => role.power_feature_selector),
-});
+const rowBySelector = (summary, selector) => summary.roles.find((row) => row.power_feature_selector === selector);
 
 describe('hawray power summary', () => {
-  let house;
   let mainsFeature;
   let kitchenFeature;
   let plugFeature;
-  let balanceFeature;
+  let house;
 
   const buildHouse = () => {
     const emporia = (selector, externalId, features) =>
       buildDevice(selector, externalId, 'Emporia Vue channel', features);
     mainsFeature = buildFeature('sum-mains-power', 'energy-sensor', 'power', 2400);
-    balanceFeature = buildFeature('sum-balance-power', 'energy-sensor', 'power', 300);
+    const balanceFeature = buildFeature('sum-balance-power', 'energy-sensor', 'power', 300);
     kitchenFeature = buildFeature('sum-kitchen-power', 'energy-sensor', 'power', 0);
     plugFeature = buildFeature('sum-plug-power', 'switch', 'power', -12.5);
     return [
@@ -88,32 +82,32 @@ describe('hawray power summary', () => {
   });
 
   describe('live', () => {
-    it('returns each feature last_value and last_value_changed, with no kWh', async () => {
+    it('returns the roles as a flat list, with last_value and last_value_changed and kwh null', async () => {
       const summary = await getSummary(buildDeps({ devices: house }), 'live', { nowMs: NOW_MS });
       expect(summary.scale).to.equal('live');
-      expect(summary.period_start).to.equal(null);
-      expect(roleSelectors(summary)).to.deep.equal({
-        mains: 'sum-mains-power',
-        balance: 'sum-balance-power',
-        circuits: ['sum-kitchen-power'],
-        plugs: ['sum-plug-power'],
-      });
-      const byFeature = Object.fromEntries(summary.values.map((value) => [value.feature_selector, value]));
-      expect(byFeature['sum-mains-power']).to.deep.equal({
-        feature_selector: 'sum-mains-power',
+      expect(summary.roles.map((row) => [row.role, row.power_feature_selector])).to.deep.equal([
+        ['mains', 'sum-mains-power'],
+        ['balance', 'sum-balance-power'],
+        ['circuit', 'sum-kitchen-power'],
+        ['plug', 'sum-plug-power'],
+      ]);
+      expect(rowBySelector(summary, 'sum-mains-power')).to.deep.equal({
+        role: 'mains',
+        device_selector: 'sum-mains',
+        name: 'sum-mains name',
+        power_feature_selector: 'sum-mains-power',
         last_value: 2400,
         last_value_changed: '2026-10-13T16:29:30.000Z',
         kwh: null,
       });
       // raw values: negative and zero are not clamped here
-      expect(byFeature['sum-plug-power'].last_value).to.equal(-12.5);
-      expect(byFeature['sum-kitchen-power'].last_value).to.equal(0);
+      expect(rowBySelector(summary, 'sum-plug-power').last_value).to.equal(-12.5);
+      expect(rowBySelector(summary, 'sum-kitchen-power').last_value).to.equal(0);
     });
 
-    it('returns the period starts of every scale in the house timezone, and the timezone', async () => {
+    it('returns the period starts of every scale in the house timezone, and the override', async () => {
       const summary = await getSummary(buildDeps({ devices: house }), 'live', { nowMs: NOW_MS });
       expect(summary.timezone).to.equal('America/New_York');
-      expect(summary.now).to.equal('2026-10-13T16:30:00.000Z');
       expect(summary.period_starts).to.deep.equal({
         min: '2026-10-13T16:30:00.000Z',
         hr: '2026-10-13T16:00:00.000Z',
@@ -122,6 +116,8 @@ describe('hawray power summary', () => {
         mo: '2026-10-01T04:00:00.000Z',
         yr: '2026-01-01T05:00:00.000Z',
       });
+      expect(summary.mains_override).to.equal(null);
+      expect(summary).to.have.all.keys('scale', 'timezone', 'period_starts', 'mains_override', 'roles');
     });
 
     it('falls back to Europe/Paris when the TIMEZONE variable is unset', async () => {
@@ -138,15 +134,14 @@ describe('hawray power summary', () => {
       const hourStart = Date.parse('2026-10-13T16:00:00Z');
       // 30 minutes at 1000 W in the current hour => 30 x 1000 x 60 / 3.6e6 = 0.5 kWh
       await sampleEveryMinute(mainsFeature.id, hourStart, NOW_MS, 1000);
-      // before the hour and after now: not counted
+      // before the hour and at or after now: not counted
       await sampleEveryMinute(mainsFeature.id, hourStart - 30 * MINUTE_MS, hourStart, 9999);
       await sampleEveryMinute(mainsFeature.id, NOW_MS, NOW_MS + 10 * MINUTE_MS, 9999);
       const summary = await getSummary(buildDeps({ devices: house }), 'hr', { nowMs: NOW_MS });
-      expect(summary.period_start).to.equal('2026-10-13T16:00:00.000Z');
-      const mains = summary.values.find((value) => value.feature_selector === 'sum-mains-power');
+      expect(summary.period_starts.hr).to.equal('2026-10-13T16:00:00.000Z');
+      const mains = rowBySelector(summary, 'sum-mains-power');
       expect(mains.kwh).to.be.closeTo(0.5, 1e-9);
-      expect(mains.last_value).to.equal(null);
-      expect(mains.last_value_changed).to.equal(null);
+      expect(mains.last_value).to.equal(2400);
     });
 
     it('counts an empty minute as 0, so an outage lowers the kWh', async () => {
@@ -155,17 +150,15 @@ describe('hawray power summary', () => {
       await sampleEveryMinute(kitchenFeature.id, hourStart, hourStart + 20 * MINUTE_MS, 600);
       await sampleEveryMinute(kitchenFeature.id, hourStart + 25 * MINUTE_MS, NOW_MS, 600);
       const summary = await getSummary(buildDeps({ devices: house }), 'hr', { nowMs: NOW_MS });
-      const kitchen = summary.values.find((value) => value.feature_selector === 'sum-kitchen-power');
-      expect(kitchen.kwh).to.be.closeTo(0.2 + (5 * 600 * 60) / 3.6e6, 1e-9);
+      expect(rowBySelector(summary, 'sum-kitchen-power').kwh).to.be.closeTo(0.2 + (5 * 600 * 60) / 3.6e6, 1e-9);
     });
 
     it('keeps negative averages raw, and reports 0 for a feature without samples', async () => {
       const hourStart = Date.parse('2026-10-13T16:00:00Z');
       await sampleEveryMinute(plugFeature.id, hourStart, NOW_MS, -500);
       const summary = await getSummary(buildDeps({ devices: house }), 'hr', { nowMs: NOW_MS });
-      const byFeature = Object.fromEntries(summary.values.map((value) => [value.feature_selector, value]));
-      expect(byFeature['sum-plug-power'].kwh).to.be.closeTo(-0.25, 1e-9);
-      expect(byFeature['sum-balance-power'].kwh).to.equal(0);
+      expect(rowBySelector(summary, 'sum-plug-power').kwh).to.be.closeTo(-0.25, 1e-9);
+      expect(rowBySelector(summary, 'sum-balance-power').kwh).to.equal(0);
     });
 
     it('uses the day period in the house timezone, starting at local midnight', async () => {
@@ -175,9 +168,14 @@ describe('hawray power summary', () => {
       await sampleEveryMinute(mainsFeature.id, dayStart, nowDay, 1000);
       await sampleEveryMinute(mainsFeature.id, nowDay, nowDay + 10 * MINUTE_MS, 9999);
       const summary = await getSummary(buildDeps({ devices: house }), 'day', { nowMs: nowDay });
-      expect(summary.period_start).to.equal('2026-10-13T04:00:00.000Z');
-      const mains = summary.values.find((value) => value.feature_selector === 'sum-mains-power');
-      expect(mains.kwh).to.be.closeTo(23.5, 1e-9);
+      expect(summary.period_starts.day).to.equal('2026-10-13T04:00:00.000Z');
+      expect(rowBySelector(summary, 'sum-mains-power').kwh).to.be.closeTo(23.5, 1e-9);
+    });
+
+    it('returns no roles, and no kWh query, when the house has no power feature', async () => {
+      const summary = await getSummary(buildDeps({ devices: [] }), 'day', { nowMs: NOW_MS });
+      expect(summary.roles).to.deep.equal([]);
+      expect(summary.period_starts.day).to.equal('2026-10-13T04:00:00.000Z');
     });
   });
 
@@ -188,29 +186,25 @@ describe('hawray power summary', () => {
         variableValues: { TIMEZONE: 'America/New_York', [MAINS_OVERRIDE_VARIABLE]: 'sum-plug' },
       });
       const summary = await getSummary(deps, 'live', { nowMs: NOW_MS });
-      expect(summary.mains_device_selector).to.equal('sum-plug');
-      expect(summary.mains_source).to.equal('override');
-      expect(roleSelectors(summary).mains).to.equal('sum-plug-power');
-      expect(roleSelectors(summary).circuits).to.deep.equal(['sum-kitchen-power', 'sum-mains-power']);
+      expect(summary.mains_override).to.equal('sum-plug');
+      expect(summary.roles.filter((row) => row.role === 'mains').map((row) => row.device_selector)).to.deep.equal([
+        'sum-plug',
+      ]);
+      expect(summary.roles.filter((row) => row.role === 'circuit').map((row) => row.device_selector)).to.deep.equal([
+        'sum-kitchen',
+        'sum-mains',
+      ]);
     });
 
-    it('reports the auto-detection when the stored override is not valid', async () => {
+    it('reports no override when the stored one is not valid', async () => {
       const deps = buildDeps({
         devices: house,
         variableValues: { TIMEZONE: 'America/New_York', [MAINS_OVERRIDE_VARIABLE]: 'no-such-device' },
       });
       const summary = await getSummary(deps, 'live', { nowMs: NOW_MS });
-      expect(summary.mains_device_selector).to.equal(null);
-      expect(summary.mains_source).to.equal('auto');
-      expect(roleSelectors(summary).mains).to.equal('sum-mains-power');
+      expect(summary.mains_override).to.equal(null);
+      expect(summary.roles[0].device_selector).to.equal('sum-mains');
     });
-  });
-
-  it('returns no values, and no kWh query, when the house has no power feature', async () => {
-    const summary = await getSummary(buildDeps({ devices: [] }), 'day', { nowMs: NOW_MS });
-    expect(summary.values).to.deep.equal([]);
-    expect(summary.roles).to.deep.equal({ mains: null, balance: null, circuits: [], plugs: [] });
-    expect(summary.period_start).to.equal('2026-10-13T04:00:00.000Z');
   });
 
   it('rejects an unknown scale with BadParameters', async () => {

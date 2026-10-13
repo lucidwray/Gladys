@@ -120,9 +120,8 @@ describe('hawray power series', () => {
         to: new Date(base + 5 * MINUTE_MS).toISOString(),
       });
       expect(result.bucket_seconds).to.equal(60);
-      expect(result.series).to.have.lengthOf(1);
-      expect(result.series[0].feature_selector).to.equal('series-gaps');
-      expect(result.series[0].points).to.deep.equal([
+      expect(Object.keys(result.series)).to.deep.equal(['series-gaps']);
+      expect(result.series['series-gaps']).to.deep.equal([
         { t: new Date(base).toISOString(), avg_w: 200 },
         { t: new Date(base + 2 * MINUTE_MS).toISOString(), avg_w: -50 },
       ]);
@@ -148,7 +147,8 @@ describe('hawray power series', () => {
         to: new Date(base + 12 * MINUTE_MS).toISOString(),
         bucket: '300',
       });
-      const [firstSeries, secondSeries] = result.series;
+      const firstSeries = { points: result.series['grid-a'] };
+      const secondSeries = { points: result.series['grid-b'] };
       expect(firstSeries.points.map((p) => p.t)).to.deep.equal([
         '2026-10-12T00:00:00.000Z',
         '2026-10-12T00:05:00.000Z',
@@ -170,7 +170,7 @@ describe('hawray power series', () => {
         to: new Date(base + 2 * MINUTE_MS).toISOString(),
         bucket: '300',
       });
-      expect(result.series[0].points).to.deep.equal([{ t: '2026-10-12T00:00:00.000Z', avg_w: 10 }]);
+      expect(result.series['align-epoch']).to.deep.equal([{ t: '2026-10-12T00:00:00.000Z', avg_w: 10 }]);
     });
 
     it('returns only the requested features, with an empty points array when none has samples', async () => {
@@ -181,9 +181,7 @@ describe('hawray power series', () => {
         to: '2026-10-12T01:00:00Z',
       });
       expect(result.bucket_seconds).to.equal(60);
-      expect(result.from).to.equal('2026-10-12T00:00:00.000Z');
-      expect(result.to).to.equal('2026-10-12T01:00:00.000Z');
-      expect(result.series).to.deep.equal([{ feature_selector: 'silent-feature', points: [] }]);
+      expect(result).to.deep.equal({ bucket_seconds: 60, series: { 'silent-feature': [] } });
     });
 
     it('rejects from >= to, and the invalid parameters, with BadParameters', async () => {

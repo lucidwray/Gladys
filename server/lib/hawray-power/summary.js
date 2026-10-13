@@ -76,16 +76,16 @@ async function getSummary(deps, scale, options = {}) {
   const mainsOverride = await getMainsOverride(variable);
   const roles = detectRoles(stateManager, mainsOverride);
 
-  const powerFeatures = [
-    ...(roles.mains ? [roles.mains] : []),
-    ...(roles.balance ? [roles.balance] : []),
-    ...roles.circuits,
-    ...roles.plugs,
-  ].map((role) => role.power_feature_selector);
+  const entries = [
+    ...(roles.mains ? [['mains', roles.mains]] : []),
+    ...(roles.balance ? [['balance', roles.balance]] : []),
+    ...roles.circuits.map((role) => ['circuit', role]),
+    ...roles.plugs.map((role) => ['plug', role]),
+  ];
+  const features = entries.map(([, role]) => stateManager.get('deviceFeature', role.power_feature_selector));
 
   let kwhByFeatureId = new Map();
   if (scale !== 'live') {
-    const features = powerFeatures.map((selector) => stateManager.get('deviceFeature', selector));
     kwhByFeatureId = await getKwhByFeatureId(
       features.map((feature) => feature.id),
       periodStarts[scale],
@@ -93,40 +93,26 @@ async function getSummary(deps, scale, options = {}) {
     );
   }
 
-  const values = powerFeatures.map((selector) => {
-    const feature = stateManager.get('deviceFeature', selector);
-    if (scale === 'live') {
-      return {
-        feature_selector: selector,
-        last_value: feature.last_value,
-        last_value_changed: feature.last_value_changed,
-        kwh: null,
-      };
-    }
+  const rows = entries.map(([role, power], index) => {
+    const feature = features[index];
     return {
-      feature_selector: selector,
-      last_value: null,
-      last_value_changed: null,
-      kwh: kwhByFeatureId.get(feature.id) || 0,
+      role,
+      device_selector: power.device_selector,
+      name: power.device_name,
+      power_feature_selector: power.power_feature_selector,
+      last_value: feature.last_value,
+      last_value_changed: feature.last_value_changed,
+      kwh: scale === 'live' ? null : kwhByFeatureId.get(feature.id) || 0,
     };
   });
 
   return {
     scale,
     timezone,
-    now: new Date(nowMs).toISOString(),
-    period_start: scale === 'live' ? null : periodStarts[scale],
     period_starts: periodStarts,
-    // the override stored in the variable, only when it is the one in effect (valid and used for mains)
-    mains_device_selector: roles.mains_source === 'override' ? mainsOverride : null,
-    mains_source: roles.mains_source,
-    roles: {
-      mains: roles.mains,
-      balance: roles.balance,
-      circuits: roles.circuits,
-      plugs: roles.plugs,
-    },
-    values,
+    // the stored override, only when it is the one in effect (valid and used for mains)
+    mains_override: roles.mains_source === 'override' ? mainsOverride : null,
+    roles: rows,
   };
 }
 

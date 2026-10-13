@@ -116,7 +116,7 @@ function resolveBucketSeconds(value, fromMs, toMs) {
  * are omitted; values are raw (not clamped).
  * @param {object} stateManager - State manager (feature lookup).
  * @param {object} params - Raw query parameters: `features`, `from`, `to`, `bucket` (optional).
- * @returns {Promise<object>} { bucket_seconds, from, to, series: [{ feature_selector, points: [{ t, avg_w }] }] }.
+ * @returns {Promise<object>} { bucket_seconds, series: { [selector]: [{ t, avg_w }] } }.
  * @example
  * await getSeries(stateManager, { features: 'a,b', from: '...', to: '...' });
  */
@@ -146,14 +146,13 @@ async function getSeries(stateManager, params = {}) {
     });
   });
 
+  const series = {};
+  features.forEach((feature) => {
+    series[feature.selector] = pointsByFeatureId.get(feature.id);
+  });
   return {
     bucket_seconds: bucketSeconds,
-    from: from.toISOString(),
-    to: to.toISOString(),
-    series: features.map((feature) => ({
-      feature_selector: feature.selector,
-      points: pointsByFeatureId.get(feature.id),
-    })),
+    series,
   };
 }
 

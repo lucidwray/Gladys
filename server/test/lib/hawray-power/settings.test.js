@@ -32,15 +32,15 @@ describe('hawray power settings', () => {
   it('stores a valid device selector under HAWRAY_POWER_MAINS_DEVICE', async () => {
     const { deps, writes } = buildDeps();
     const result = await setMainsOverride(deps, 'settings-plug');
-    expect(result).to.deep.equal({ mains_device_selector: 'settings-plug' });
+    expect(result).to.deep.equal({ mains_override: 'settings-plug' });
     expect(writes).to.deep.equal([[MAINS_OVERRIDE_VARIABLE, 'settings-plug']]);
   });
 
   it('clears the override with an empty, null or missing selector', async () => {
     const { deps, writes } = buildDeps();
-    expect(await setMainsOverride(deps, '')).to.deep.equal({ mains_device_selector: null });
-    expect(await setMainsOverride(deps, null)).to.deep.equal({ mains_device_selector: null });
-    expect(await setMainsOverride(deps, undefined)).to.deep.equal({ mains_device_selector: null });
+    expect(await setMainsOverride(deps, '')).to.deep.equal({ mains_override: null });
+    expect(await setMainsOverride(deps, null)).to.deep.equal({ mains_override: null });
+    expect(await setMainsOverride(deps, undefined)).to.deep.equal({ mains_override: null });
     expect(writes).to.deep.equal([
       [MAINS_OVERRIDE_VARIABLE, ''],
       [MAINS_OVERRIDE_VARIABLE, ''],

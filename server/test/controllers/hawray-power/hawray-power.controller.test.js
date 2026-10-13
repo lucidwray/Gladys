@@ -61,7 +61,7 @@ describe('hawray power endpoints', () => {
         .expect(200)
         .then((res) => {
           expect(res.body).to.have.property('bucket_seconds', 60);
-          expect(res.body.series).to.deep.equal([{ feature_selector: 'test-device-feature', points: [] }]);
+          expect(res.body.series).to.deep.equal({ 'test-device-feature': [] });
         });
     });
 
@@ -110,8 +110,20 @@ describe('hawray power endpoints', () => {
           expect(res.body).to.have.property('scale', 'live');
           expect(res.body).to.have.property('timezone');
           expect(res.body.period_starts).to.have.all.keys('min', 'hr', 'day', 'wk', 'mo', 'yr');
-          expect(res.body.roles).to.have.all.keys('mains', 'balance', 'circuits', 'plugs');
-          expect(res.body.roles.plugs.map((role) => role.power_feature_selector)).to.include(POWER_FEATURE);
+          expect(res.body.mains_override).to.equal(null);
+          expect(res.body.roles).to.be.an('array');
+          expect(res.body.roles.map((role) => role.role)).to.include('plug');
+          const plug = res.body.roles.find((role) => role.power_feature_selector === POWER_FEATURE);
+          expect(plug).to.have.all.keys(
+            'role',
+            'device_selector',
+            'name',
+            'power_feature_selector',
+            'last_value',
+            'last_value_changed',
+            'kwh',
+          );
+          expect(plug.kwh).to.equal(null);
         });
     });
 
@@ -121,8 +133,7 @@ describe('hawray power endpoints', () => {
         .query({ scale: 'day' })
         .expect(200)
         .then((res) => {
-          expect(res.body.period_start).to.equal(res.body.period_starts.day);
-          const plug = res.body.values.find((value) => value.feature_selector === POWER_FEATURE);
+          const plug = res.body.roles.find((role) => role.power_feature_selector === POWER_FEATURE);
           expect(plug).to.have.property('kwh', 0);
         });
       await authenticatedRequest
@@ -160,7 +171,7 @@ describe('hawray power endpoints', () => {
     afterEach(async () => {
       await authenticatedRequest
         .post('/api/v1/hawray/power/settings')
-        .send({ mains_device_selector: '' })
+        .send({ mains_device_selector: null })
         .expect(200);
     });
 
@@ -171,16 +182,16 @@ describe('hawray power endpoints', () => {
         .expect('Content-Type', /json/)
         .expect(200)
         .then((res) => {
-          expect(res.body).to.deep.equal({ mains_device_selector: POWER_DEVICE });
+          expect(res.body).to.deep.equal({ mains_override: POWER_DEVICE });
         });
       await authenticatedRequest
         .get('/api/v1/hawray/power/summary')
         .query({ scale: 'live' })
         .expect(200)
         .then((res) => {
-          expect(res.body.mains_source).to.equal('override');
-          expect(res.body.mains_device_selector).to.equal(POWER_DEVICE);
-          expect(res.body.roles.mains.power_feature_selector).to.equal(POWER_FEATURE);
+          expect(res.body.mains_override).to.equal(POWER_DEVICE);
+          const mains = res.body.roles.find((role) => role.role === 'mains');
+          expect(mains.power_feature_selector).to.equal(POWER_FEATURE);
         });
     });
 
@@ -192,7 +203,7 @@ describe('hawray power endpoints', () => {
         .expect('Content-Type', /json/)
         .expect(200)
         .then((res) => {
-          expect(res.body).to.deep.equal({ mains_device_selector: POWER_DEVICE });
+          expect(res.body).to.deep.equal({ mains_override: POWER_DEVICE });
         });
     });
 

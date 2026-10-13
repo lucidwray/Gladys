@@ -23,6 +23,7 @@ const VariableController = require('./controllers/variable.controller');
 const WeatherController = require('./controllers/weather.controller');
 const EnergyPriceController = require('./controllers/energy-price.controller');
 const EnergyContractController = require('./controllers/energy-contract.controller');
+const HawrayPowerController = require('./controllers/hawray-power.controller');
 
 /**
  * @description Return object of routes.
@@ -57,6 +58,7 @@ function getRoutes(gladys) {
   const weatherController = WeatherController(gladys);
   const energyPriceController = EnergyPriceController(gladys);
   const energyContractController = EnergyContractController(gladys);
+  const hawrayPowerController = HawrayPowerController(gladys);
 
   const routes = {};
 
@@ -1176,6 +1178,19 @@ function getRoutes(gladys) {
     'get /api/v1/energy_calendar/:key': {
       authenticated: true,
       controller: energyContractController.getCalendarEntries,
+    },
+    // hawray Power page (docs/specs/hawray-power-page.md, section 7): any logged-in user, not admin
+    'get /api/v1/hawray/power/series': {
+      authenticated: true,
+      controller: hawrayPowerController.series,
+    },
+    'get /api/v1/hawray/power/summary': {
+      authenticated: true,
+      controller: hawrayPowerController.summary,
+    },
+    'post /api/v1/hawray/power/settings': {
+      authenticated: true,
+      controller: hawrayPowerController.settings,
     },
     // energy price: read-only compatibility window (section 9.4)
     'get /api/v1/energy_price': {

@@ -6,6 +6,7 @@ import { dashboards } from './dashboards';
 import { getWeather, getSunState } from './weather';
 import { scenes, sceneTags, calendars, calendarEvents, messages } from './scenes';
 import { getAggregatedStates, getEnergyConsumption, getStatesCsv, getStatesHistory } from './history';
+import { powerFixtures } from './power';
 import { demoLanguage, uuid, hoursAgo, minutesAgo, solarPowerNow } from './helpers';
 import integrations from './integrations';
 import { translate } from './i18n';
@@ -581,6 +582,7 @@ const home = {
 
   // --- Settings ----------------------------------------------------------
   ...variables,
+  ...powerFixtures,
   'get /api/v1/device/duckdb_migration_state': {
     is_migration_needed: false,
     is_duck_db_migrated: true,

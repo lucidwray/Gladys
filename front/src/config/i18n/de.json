@@ -7180,6 +7180,65 @@
     "on": "An",
     "off": "Aus"
   },
+  "hawrayPower": {
+    "nav": "Strom",
+    "title": "Strom",
+    "subtitle": "Der Stromverbrauch des Hauses und jedes Stromkreises, live und im Verlauf",
+    "loading": "Stromdaten werden geladen…",
+    "error": "Die Stromdaten konnten nicht geladen werden.",
+    "retry": "Erneut versuchen",
+    "table": {
+      "tabs": {
+        "live": "Live",
+        "min": "Min",
+        "hr": "Std",
+        "day": "Tag",
+        "wk": "Woche",
+        "mo": "Monat",
+        "yr": "Jahr"
+      },
+      "columns": {
+        "name": "Name",
+        "value": "Wert",
+        "share": "Anteil"
+      },
+      "total": "Gesamtverbrauch",
+      "other": "Sonstige / nicht gemessen",
+      "plugs": "Steckdosen",
+      "noMains": "Kein Hauptzähler erkannt. Wähle unten das Gerät des Hauptzählers, um die Summe zu sehen.",
+      "liveNote": "Live ist der Durchschnitt der letzten Minute, in kW. Die übrigen Reiter zeigen die kWh des laufenden Zeitraums bis jetzt.",
+      "periodNote": "kWh seit {{start}}"
+    },
+    "chart": {
+      "title": "Leistung des Hauptzählers",
+      "mains": "Gesamtverbrauch",
+      "rangeLabel": "Zeitraum des Diagramms",
+      "ranges": {
+        "15m": "15 Min.",
+        "1h": "1 Std.",
+        "6h": "6 Std.",
+        "24h": "24 Std.",
+        "7d": "7 Tage",
+        "30d": "30 Tage",
+        "1y": "1 Jahr"
+      },
+      "overlay": "Überlagern",
+      "noMains": "Noch kein Hauptzähler erkannt."
+    },
+    "stack": {
+      "title": "Je Stromkreis",
+      "current": "{{value}} W"
+    },
+    "settings": {
+      "title": "Hauptzähler",
+      "hint": "Der Gesamtverbrauch ist der Hauptzähler. Er wird automatisch aus den Emporia-Kanälen erkannt; hier kannst du bei Bedarf ein anderes Gerät wählen.",
+      "mainsLabel": "Gerät des Hauptzählers",
+      "auto": "Automatisch erkannt",
+      "save": "Speichern",
+      "saved": "Das Gerät des Hauptzählers ist gespeichert.",
+      "error": "Das Gerät des Hauptzählers konnte nicht gespeichert werden."
+    }
+  },
   "hawrayControls": {
     "nav": "Steuerung",
     "list": {

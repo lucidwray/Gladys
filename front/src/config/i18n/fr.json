@@ -7180,6 +7180,65 @@
     "on": "Allumé",
     "off": "Éteint"
   },
+  "hawrayPower": {
+    "nav": "Puissance",
+    "title": "Puissance",
+    "subtitle": "La puissance de la maison et de chaque circuit, en direct et dans le temps",
+    "loading": "Chargement des données de puissance…",
+    "error": "Les données de puissance n'ont pas pu être chargées.",
+    "retry": "Réessayer",
+    "table": {
+      "tabs": {
+        "live": "Direct",
+        "min": "Min",
+        "hr": "H",
+        "day": "Jour",
+        "wk": "Sem",
+        "mo": "Mois",
+        "yr": "An"
+      },
+      "columns": {
+        "name": "Nom",
+        "value": "Valeur",
+        "share": "Part"
+      },
+      "total": "Consommation totale",
+      "other": "Autre / non mesuré",
+      "plugs": "Prises",
+      "noMains": "Aucun compteur général détecté. Choisissez ci-dessous l'appareil du compteur général pour voir le total.",
+      "liveNote": "En direct : moyenne de la dernière minute, en kW. Les autres onglets affichent les kWh de la période en cours jusqu'à maintenant.",
+      "periodNote": "kWh depuis le {{start}}"
+    },
+    "chart": {
+      "title": "Puissance générale",
+      "mains": "Consommation totale",
+      "rangeLabel": "Période du graphique",
+      "ranges": {
+        "15m": "15 min",
+        "1h": "1 h",
+        "6h": "6 h",
+        "24h": "24 h",
+        "7d": "7 jours",
+        "30d": "30 jours",
+        "1y": "1 an"
+      },
+      "overlay": "Superposer",
+      "noMains": "Aucun compteur général détecté pour l'instant."
+    },
+    "stack": {
+      "title": "Par circuit",
+      "current": "{{value}} W"
+    },
+    "settings": {
+      "title": "Compteur général",
+      "hint": "La consommation totale est le compteur général. Il est détecté à partir des canaux Emporia ; choisissez ici un autre appareil si besoin.",
+      "mainsLabel": "Appareil du compteur général",
+      "auto": "Détection automatique",
+      "save": "Enregistrer",
+      "saved": "L'appareil du compteur général est enregistré.",
+      "error": "L'appareil du compteur général n'a pas pu être enregistré."
+    }
+  },
   "hawrayControls": {
     "nav": "Contrôles",
     "list": {

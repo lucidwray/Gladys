@@ -1,0 +1,60 @@
+.powerPage {
+  min-height: 100%;
+}
+
+/* Values are right-aligned and do not wrap, so a column of kW keeps its figures in line */
+.value {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.name {
+  overflow-wrap: anywhere;
+}
+
+.sectionTitle {
+  letter-spacing: 0.04em;
+}
+
+/* The tabs scroll inside their own box on a phone: the page itself never scrolls sideways */
+.tabsWrap {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabs {
+  flex-wrap: nowrap;
+}
+
+.bigChart {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.stackRow {
+  min-width: 0;
+  margin-bottom: 0.25rem;
+}
+
+.skeleton {
+  min-height: 120px;
+  border-radius: 0.25rem;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* The labels of the time axis sit in the box of the rows' plots: the same width, so they line up with the lines */
+.timeAxis {
+  position: relative;
+  height: 1.25rem;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.timeTick {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+}

@@ -8,6 +8,13 @@ import SelectDeviceFeature from '../../../../components/device/SelectDeviceFeatu
 import SelectDeviceFeatureValue from '../../../../components/device/SelectDeviceFeatureValue';
 import getDeviceFeatureValueOptions, { isValueInOptions } from '../../../../utils/deviceFeatureValueOptions';
 import withIntlAsProp from '../../../../utils/withIntlAsProp';
+import {
+  fromEditedTemperature,
+  getEditorSetpoint,
+  getUserTemperatureDisplay,
+  getUserTemperatureRange,
+  showsWholeFahrenheit
+} from '../../../../utils/hawrayTemperature';
 
 import { DEVICE_FEATURE_CATEGORIES, DEVICE_FEATURE_TYPES } from '../../../../../../server/utils/constants';
 import TextWithVariablesInjected from '../../../../components/scene/TextWithVariablesInjected';
@@ -68,6 +75,26 @@ class DeviceSetValue extends Component {
   };
 
   handleNewValue = e => {
+    const { deviceFeature } = this.state;
+    // A Fahrenheit user types whole degrees Fahrenheit; the action keeps the feature's own unit
+    if (deviceFeature && showsWholeFahrenheit(deviceFeature.unit, this.props.user)) {
+      const typed = parseFloat(String(e.target.value).replace(',', '.'));
+      if (Number.isFinite(typed)) {
+        const setpoint = getEditorSetpoint(
+          deviceFeature.unit,
+          deviceFeature.step,
+          deviceFeature.min,
+          deviceFeature.max
+        );
+        this.props.updateActionProperty(
+          this.props.path,
+          'value',
+          fromEditedTemperature(typed, this.props.action.value, setpoint)
+        );
+        this.props.updateActionProperty(this.props.path, 'evaluate_value', undefined);
+        return;
+      }
+    }
     this.props.updateActionProperty(this.props.path, 'value', e.target.value);
     this.props.updateActionProperty(this.props.path, 'evaluate_value', undefined);
   };
@@ -311,6 +338,20 @@ class DeviceSetValue extends Component {
       );
     }
 
+    const wholeFahrenheit = showsWholeFahrenheit(this.state.deviceFeature.unit, this.props.user);
+    const temperatureDisplay = wholeFahrenheit
+      ? getUserTemperatureDisplay(this.props.action.value, this.state.deviceFeature.unit, this.props.user)
+      : null;
+    const sliderRange = wholeFahrenheit
+      ? getUserTemperatureRange(
+          this.state.deviceFeature.min,
+          this.state.deviceFeature.max,
+          this.state.deviceFeature.unit,
+          this.props.user
+        )
+      : null;
+    const shownValue = temperatureDisplay ? temperatureDisplay.value : this.props.action.value;
+
     return (
       <div>
         <div className={style.explanationText}>
@@ -323,13 +364,13 @@ class DeviceSetValue extends Component {
               placeholder={<Text id="editScene.actionsCard.deviceSetValue.valueLabel" />}
               class="form-control"
               onChange={this.handleNewValue}
-              value={this.props.action.value}
+              value={shownValue}
             />
           </Localizer>
           {this.state.deviceFeature.unit && (
             <span class="input-group-append" id="basic-addon2">
               <span class="input-group-text">
-                <Text id={`deviceFeatureUnitShort.${this.state.deviceFeature.unit}`} />
+                <Text id={`deviceFeatureUnitShort.${wholeFahrenheit ? 'fahrenheit' : this.state.deviceFeature.unit}`} />
               </span>
             </span>
           )}
@@ -340,14 +381,14 @@ class DeviceSetValue extends Component {
         {!valueOptions && (
           <input
             type="range"
-            value={this.props.action.value}
+            value={shownValue}
             onChange={this.handleNewValue}
             class={cx('form-control custom-range', {
               'light-temperature': this.state.deviceFeature.type === DEVICE_FEATURE_TYPES.LIGHT.TEMPERATURE
             })}
             step="1"
-            min={this.state.deviceFeature.min}
-            max={this.state.deviceFeature.max}
+            min={sliderRange ? sliderRange.min : this.state.deviceFeature.min}
+            max={sliderRange ? sliderRange.max : this.state.deviceFeature.max}
           />
         )}
         {valueOptions && (
@@ -407,4 +448,4 @@ class DeviceSetValue extends Component {
   }
 }
 
-export default withIntlAsProp(connect('httpClient', {})(DeviceSetValue));
+export default withIntlAsProp(connect('httpClient,user', {})(DeviceSetValue));

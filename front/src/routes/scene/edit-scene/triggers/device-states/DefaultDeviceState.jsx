@@ -1,11 +1,18 @@
 import { Component, Fragment } from 'preact';
 import { Text, Localizer } from 'preact-i18n';
+import { connect } from 'unistore/preact';
 
 import { DEVICE_FEATURE_CATEGORIES } from '../../../../../../../server/utils/constants';
 
 import SelectDeviceFeatureValue from '../../../../../components/device/SelectDeviceFeatureValue';
 import getDeviceFeatureValueOptions, { isValueInOptions } from '../../../../../utils/deviceFeatureValueOptions';
 import withIntlAsProp from '../../../../../utils/withIntlAsProp';
+import {
+  fromEditedTemperature,
+  getEditorSetpoint,
+  getUserTemperatureDisplay,
+  showsWholeFahrenheit
+} from '../../../../../utils/hawrayTemperature';
 
 class DefaultDeviceState extends Component {
   constructor(props) {
@@ -32,7 +39,18 @@ class DefaultDeviceState extends Component {
       }
       const lastCharacter = value.length > 0 ? value[value.length - 1] : '';
       if (!isNaN(parseFloat(e.target.value)) && lastCharacter !== '.') {
-        this.props.updateTriggerProperty(this.props.index, 'value', parseFloat(value));
+        const number = parseFloat(value);
+        // A Fahrenheit user types whole degrees Fahrenheit; the trigger keeps the feature's own unit
+        if (showsWholeFahrenheit(selectedDeviceFeature.unit, this.props.user)) {
+          const setpoint = getEditorSetpoint(selectedDeviceFeature.unit);
+          this.props.updateTriggerProperty(
+            this.props.index,
+            'value',
+            fromEditedTemperature(number, this.props.trigger.value, setpoint)
+          );
+        } else {
+          this.props.updateTriggerProperty(this.props.index, 'value', number);
+        }
       } else {
         this.props.updateTriggerProperty(this.props.index, 'value', value);
       }
@@ -72,12 +90,16 @@ class DefaultDeviceState extends Component {
     return value === undefined || value === null || value === '' || isValueInOptions(valueOptions, value);
   };
 
-  render({ selectedDeviceFeature, trigger }) {
+  render({ selectedDeviceFeature, trigger, user }) {
     const isTextFeature = selectedDeviceFeature && selectedDeviceFeature.category === DEVICE_FEATURE_CATEGORIES.TEXT;
     // Features holding a known list of constants (vacuum cleaner state, lock state, siren mode...)
     // get the same labeled list as the device widget, instead of a raw number to guess
     const valueOptions = this.getValueOptions();
     const showValueOptions = this.shouldDisplayValueOptions(valueOptions);
+    const wholeFahrenheit = Boolean(selectedDeviceFeature) && showsWholeFahrenheit(selectedDeviceFeature.unit, user);
+    const temperatureDisplay = wholeFahrenheit
+      ? getUserTemperatureDisplay(trigger.value, selectedDeviceFeature.unit, user)
+      : null;
 
     return (
       <Fragment>
@@ -132,14 +154,16 @@ class DefaultDeviceState extends Component {
                     type="text"
                     class="form-control"
                     placeholder={<Text id="editScene.triggersCard.newState.valuePlaceholder" />}
-                    value={trigger.value}
+                    value={temperatureDisplay ? temperatureDisplay.value : trigger.value}
                     onChange={this.handleValueChange}
                   />
                 </Localizer>
                 {selectedDeviceFeature.unit && (
                   <span class="input-group-append" id="basic-addon2">
                     <span class="input-group-text">
-                      <Text id={`deviceFeatureUnitShort.${selectedDeviceFeature.unit}`} />
+                      <Text
+                        id={`deviceFeatureUnitShort.${wholeFahrenheit ? 'fahrenheit' : selectedDeviceFeature.unit}`}
+                      />
                     </span>
                   </span>
                 )}
@@ -165,4 +189,4 @@ class DefaultDeviceState extends Component {
   }
 }
 
-export default withIntlAsProp(DefaultDeviceState);
+export default connect('user', {})(withIntlAsProp(DefaultDeviceState));

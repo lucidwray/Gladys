@@ -271,4 +271,16 @@ assert.strictEqual(t.formatFahrenheitAxisTick(72), '72');
 assert.strictEqual(t.formatFahrenheitAxisTick(71.5), '71.5');
 assert.strictEqual(t.formatFahrenheitAxisTick(71.999999), '72');
 assert.strictEqual(t.formatFahrenheitAxisTick(null), null);
+// editors: a value is converted only when the user changed it, on the 0.5 C grid
+const editor = (unit, step) => t.getEditorSetpoint(unit, step, undefined, undefined);
+assert.strictEqual(t.fromEditedTemperature(74, undefined, editor(C)), 23.5);
+assert.strictEqual(t.fromEditedTemperature(74, 22.3, editor(C)), 23.5);
+assert.strictEqual(t.fromEditedTemperature(72, 22.3, editor(C)), 22.3); // 22.3 C is shown 72 F: untouched, kept
+assert.strictEqual(t.fromEditedTemperature(72, '22.3', editor(C)), '22.3');
+assert.strictEqual(t.fromEditedTemperature(73, 22.3, editor(C)), 23);
+assert.strictEqual(t.fromEditedTemperature(71, 70.5, editor(F)), 70.5); // F native, shown 71: kept
+assert.strictEqual(t.fromEditedTemperature(74, 70.5, editor(F)), 74);
+assert.strictEqual(t.fromEditedTemperature(74, '', editor(C)), 23.5);
+assert.strictEqual(t.fromEditedTemperature(74, 20, t.getEditorSetpoint(C, 2, 7, 30)), 24); // feature step 2 C
+assert.strictEqual(t.fromEditedTemperature(90, 20, t.getEditorSetpoint(C, undefined, 7, 30)), 30); // clamped
 console.log('OK');

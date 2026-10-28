@@ -155,3 +155,30 @@ export const stepSetpoint = (value, direction, setpoint, defaultDisplayStep) => 
   const roundingStep = getRoundingStep(setpoint.featureStep, setpoint.featureUnit);
   return clampToBounds(roundToStep(value + direction * roundingStep, roundingStep), setpoint.min, setpoint.max);
 };
+
+// The editors (scene trigger / action, gauge thresholds) show a stored value in whole degrees Fahrenheit to a Fahrenheit
+// user. The value an editor stores is only converted when the user actually changed the field: a value shown as
+// 72 F that is "typed" again as 72 stays what it was (22.3 C stays 22.3, not 22.5). Anything else is converted to the
+// feature's unit on its grid (0.5 C, or the feature's own step), within the bounds given.
+export const fromEditedTemperature = (displayValue, storedValue, setpoint) => {
+  const stored = Number(storedValue);
+  if (
+    storedValue !== null &&
+    storedValue !== undefined &&
+    storedValue !== '' &&
+    Number.isFinite(stored) &&
+    toDisplayValue(stored, setpoint.featureUnit, setpoint.displayUnit) === displayValue
+  ) {
+    return storedValue;
+  }
+  return toFeatureSetpoint(displayValue, setpoint);
+};
+
+// The setpoint description of a Fahrenheit user editing a value held in `unit`.
+export const getEditorSetpoint = (unit, featureStep, min, max) => ({
+  featureUnit: unit,
+  displayUnit: DEVICE_FEATURE_UNITS.FAHRENHEIT,
+  featureStep,
+  min,
+  max
+});

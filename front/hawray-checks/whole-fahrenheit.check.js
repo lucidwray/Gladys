@@ -195,6 +195,27 @@ const runGroup = (userUnit, presses, direction, start) => {
   const celsiusRun = runGroup(C, 2, 1, 22);
   assert.deepStrictEqual(celsiusRun.shown, [22, 23, 24]);
   assert.deepStrictEqual(celsiusRun.sentToMembers[0], [23, 23]);
+
+  // A Celsius user on a mixed group (first member a Fahrenheit thermostat at 70 F, so the group is in F; second a
+  // Celsius thermostat with no step at 21 C): six + presses. The Celsius member gets exactly the b59e57b9 writes,
+  // whole degrees Celsius; the half degree grid is only for a Fahrenheit user.
+  let mixed = [{ ...member('f', 70), unit: F, min: 45, max: 86 }, member('c', 21)];
+  const celsiusMemberWrites = [];
+  for (let i = 0; i < 6; i += 1) {
+    const [groupFeature] = g.buildGroupFeatures(mixed, C);
+    const setpoint = {
+      featureUnit: groupFeature.unit,
+      displayUnit: C,
+      featureStep: groupFeature.step,
+      min: groupFeature.min,
+      max: groupFeature.max
+    };
+    const sent = t.stepSetpoint(groupFeature.last_value, 1, setpoint, 0.5);
+    const writes = g.planGroupWrites(mixed, groupFeature, sent, C);
+    celsiusMemberWrites.push(writes.find(w => w.selector === 'c').value);
+    mixed = g.applyWritesToMembers(mixed, writes, new Date().toISOString());
+  }
+  assert.deepStrictEqual(celsiusMemberWrites, [22, 22, 23, 23, 24, 24], `C member writes ${celsiusMemberWrites}`);
 }
 
 // Display step: whole degrees in F, untouched in C

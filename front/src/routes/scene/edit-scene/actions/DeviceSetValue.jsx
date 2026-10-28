@@ -9,7 +9,7 @@ import SelectDeviceFeatureValue from '../../../../components/device/SelectDevice
 import getDeviceFeatureValueOptions, { isValueInOptions } from '../../../../utils/deviceFeatureValueOptions';
 import withIntlAsProp from '../../../../utils/withIntlAsProp';
 import {
-  fromEditedTemperature,
+  commitTemperatureText,
   getEditorSetpoint,
   getUserTemperatureDisplay,
   getUserTemperatureRange,
@@ -34,7 +34,8 @@ class DeviceSetValue extends Component {
     this.props = props;
     this.state = {
       computed: props.action.evaluate_value !== undefined,
-      customValue: false
+      customValue: false,
+      temperatureText: null
     };
   }
 
@@ -78,25 +79,38 @@ class DeviceSetValue extends Component {
     const { deviceFeature } = this.state;
     // A Fahrenheit user types whole degrees Fahrenheit; the action keeps the feature's own unit
     if (deviceFeature && showsWholeFahrenheit(deviceFeature.unit, this.props.user)) {
-      const typed = parseFloat(String(e.target.value).replace(',', '.'));
-      if (Number.isFinite(typed)) {
-        const setpoint = getEditorSetpoint(
-          deviceFeature.unit,
-          deviceFeature.step,
-          deviceFeature.min,
-          deviceFeature.max
-        );
-        this.props.updateActionProperty(
-          this.props.path,
-          'value',
-          fromEditedTemperature(typed, this.props.action.value, setpoint)
-        );
-        this.props.updateActionProperty(this.props.path, 'evaluate_value', undefined);
-        return;
-      }
+      this.commitTemperatureText(e.target.value);
+      return;
     }
     this.props.updateActionProperty(this.props.path, 'value', e.target.value);
     this.props.updateActionProperty(this.props.path, 'evaluate_value', undefined);
+  };
+
+  // A Fahrenheit user's typing is held as text and read only when the edit ends (blur / Enter) or the slider moves,
+  // so a value on the way ("7" on the way to "74") is never converted or clamped to the device range.
+  handleTemperatureText = e => this.setState({ temperatureText: e.target.value });
+
+  handleTemperatureKeyDown = e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      this.commitTemperatureText(this.state.temperatureText);
+    }
+  };
+
+  handleTemperatureBlur = () => this.commitTemperatureText(this.state.temperatureText);
+
+  commitTemperatureText = text => {
+    const { deviceFeature } = this.state;
+    this.setState({ temperatureText: null });
+    if (text === null || text === undefined) {
+      return;
+    }
+    const setpoint = getEditorSetpoint(deviceFeature.unit, deviceFeature.step, deviceFeature.min, deviceFeature.max);
+    const committed = commitTemperatureText(text, this.props.action.value, setpoint);
+    if (committed) {
+      this.props.updateActionProperty(this.props.path, 'value', committed.value);
+      this.props.updateActionProperty(this.props.path, 'evaluate_value', undefined);
+    }
   };
 
   handleNewPureValue = value => {
@@ -350,7 +364,10 @@ class DeviceSetValue extends Component {
           this.props.user
         )
       : null;
+    const { temperatureText } = this.state;
     const shownValue = temperatureDisplay ? temperatureDisplay.value : this.props.action.value;
+    const typedValue =
+      wholeFahrenheit && temperatureText !== null && temperatureText !== undefined ? temperatureText : shownValue;
 
     return (
       <div>
@@ -363,8 +380,10 @@ class DeviceSetValue extends Component {
               type="text"
               placeholder={<Text id="editScene.actionsCard.deviceSetValue.valueLabel" />}
               class="form-control"
-              onChange={this.handleNewValue}
-              value={shownValue}
+              onChange={wholeFahrenheit ? this.handleTemperatureText : this.handleNewValue}
+              onBlur={wholeFahrenheit ? this.handleTemperatureBlur : undefined}
+              onKeyDown={wholeFahrenheit ? this.handleTemperatureKeyDown : undefined}
+              value={typedValue}
             />
           </Localizer>
           {this.state.deviceFeature.unit && (

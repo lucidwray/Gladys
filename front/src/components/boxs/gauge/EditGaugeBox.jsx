@@ -182,7 +182,8 @@ class EditGaugeBoxComponent extends Component {
     let sliderMin = featureMin;
     let sliderMax = featureMax;
     let sliderValue = [gaugeMin, gaugeMax];
-    if (wholeFahrenheit && featureHasRange) {
+    // (a feature with no range of its own is shown over the same 0-100 default, in the same unit)
+    if (wholeFahrenheit) {
       const displayRange = getUserTemperatureRange(featureMin, featureMax, selectedFeature.unit, props.user);
       sliderMin = displayRange.min;
       sliderMax = displayRange.max;

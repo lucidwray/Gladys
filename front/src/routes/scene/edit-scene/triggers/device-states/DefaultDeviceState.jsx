@@ -8,7 +8,7 @@ import SelectDeviceFeatureValue from '../../../../../components/device/SelectDev
 import getDeviceFeatureValueOptions, { isValueInOptions } from '../../../../../utils/deviceFeatureValueOptions';
 import withIntlAsProp from '../../../../../utils/withIntlAsProp';
 import {
-  fromEditedTemperature,
+  commitTemperatureText,
   getEditorSetpoint,
   getUserTemperatureDisplay,
   showsWholeFahrenheit
@@ -18,7 +18,8 @@ class DefaultDeviceState extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      customValueSelector: null
+      customValueSelector: null,
+      temperatureText: null
     };
   }
 
@@ -33,27 +34,46 @@ class DefaultDeviceState extends Component {
 
     if (isTextFeature) {
       this.props.updateTriggerProperty(this.props.index, 'value', value);
+    } else if (selectedDeviceFeature && showsWholeFahrenheit(selectedDeviceFeature.unit, this.props.user)) {
+      // A Fahrenheit user types whole degrees Fahrenheit. The typing is held as text ("72.", "-", "" are steps on
+      // the way to a value) and read when the edit ends; the trigger keeps the feature's own unit
+      this.setState({ temperatureText: value });
     } else {
       if (value.includes(',')) {
         value = value.replaceAll(',', '.');
       }
       const lastCharacter = value.length > 0 ? value[value.length - 1] : '';
       if (!isNaN(parseFloat(e.target.value)) && lastCharacter !== '.') {
-        const number = parseFloat(value);
-        // A Fahrenheit user types whole degrees Fahrenheit; the trigger keeps the feature's own unit
-        if (showsWholeFahrenheit(selectedDeviceFeature.unit, this.props.user)) {
-          const setpoint = getEditorSetpoint(selectedDeviceFeature.unit);
-          this.props.updateTriggerProperty(
-            this.props.index,
-            'value',
-            fromEditedTemperature(number, this.props.trigger.value, setpoint)
-          );
-        } else {
-          this.props.updateTriggerProperty(this.props.index, 'value', number);
-        }
+        this.props.updateTriggerProperty(this.props.index, 'value', parseFloat(value));
       } else {
         this.props.updateTriggerProperty(this.props.index, 'value', value);
       }
+    }
+  };
+
+  // Commits the text a Fahrenheit user typed (blur / Enter). The value lands on the feature's grid: 0.5 C, or 1 F
+  // for a feature held in Fahrenheit (72.5 F is 22.5 C; as a Fahrenheit value it rounds to 73).
+  commitTemperatureText = () => {
+    const { temperatureText } = this.state;
+    const { selectedDeviceFeature } = this.props;
+    this.setState({ temperatureText: null });
+    if (temperatureText === null || temperatureText === undefined) {
+      return;
+    }
+    const committed = commitTemperatureText(
+      temperatureText,
+      this.props.trigger.value,
+      getEditorSetpoint(selectedDeviceFeature.unit)
+    );
+    if (committed) {
+      this.props.updateTriggerProperty(this.props.index, 'value', committed.value);
+    }
+  };
+
+  handleTemperatureKeyDown = e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      this.commitTemperatureText();
     }
   };
 
@@ -90,7 +110,7 @@ class DefaultDeviceState extends Component {
     return value === undefined || value === null || value === '' || isValueInOptions(valueOptions, value);
   };
 
-  render({ selectedDeviceFeature, trigger, user }) {
+  render({ selectedDeviceFeature, trigger, user }, { temperatureText }) {
     const isTextFeature = selectedDeviceFeature && selectedDeviceFeature.category === DEVICE_FEATURE_CATEGORIES.TEXT;
     // Features holding a known list of constants (vacuum cleaner state, lock state, siren mode...)
     // get the same labeled list as the device widget, instead of a raw number to guess
@@ -154,8 +174,16 @@ class DefaultDeviceState extends Component {
                     type="text"
                     class="form-control"
                     placeholder={<Text id="editScene.triggersCard.newState.valuePlaceholder" />}
-                    value={temperatureDisplay ? temperatureDisplay.value : trigger.value}
+                    value={
+                      wholeFahrenheit && temperatureText !== null && temperatureText !== undefined
+                        ? temperatureText
+                        : temperatureDisplay
+                        ? temperatureDisplay.value
+                        : trigger.value
+                    }
                     onChange={this.handleValueChange}
+                    onBlur={wholeFahrenheit ? this.commitTemperatureText : undefined}
+                    onKeyDown={wholeFahrenheit ? this.handleTemperatureKeyDown : undefined}
                   />
                 </Localizer>
                 {selectedDeviceFeature.unit && (

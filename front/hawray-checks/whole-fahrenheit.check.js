@@ -309,4 +309,31 @@ assert.strictEqual(sum.getActionSummary(act('f-c', { evaluate_value: '{{x}}' }),
   assert.strictEqual(sum.getActionSummary(act('f-c', { value: 23.5 }), {}, ctx), 'f-c · 23.5');
 });
 assert.strictEqual(sum.getTriggerSummary(trig('f-pct', 40), {}, fCtx), 'f-pct · >= 40');
+// Typed text (a Fahrenheit user's editors): partial text is never a number, a comma is a decimal point
+['', '-', '.', '72x', 'abc', '--5', '7 2'].forEach(text =>
+  assert.strictEqual(t.parseTemperatureText(text), null, text)
+);
+assert.strictEqual(t.parseTemperatureText('7'), 7);
+assert.strictEqual(t.parseTemperatureText('72.'), 72);
+assert.strictEqual(t.parseTemperatureText('72,5'), 72.5);
+assert.strictEqual(t.parseTemperatureText('-5'), -5);
+assert.strictEqual(t.parseTemperatureText('.5'), 0.5);
+// Commit: 74 F on a 7..30 C thermostat is 23.5 C; out of range clamps inward only on commit; 72.5 F trigger is 22.5 C
+const thermostat = setpointOf(C, undefined, 7, 30);
+assert.deepStrictEqual(t.commitTemperatureText('74', 18, thermostat), { value: 23.5 });
+assert.deepStrictEqual(t.commitTemperatureText('7', 18, thermostat), { value: 7 });
+assert.deepStrictEqual(t.commitTemperatureText('200', 18, thermostat), { value: 30 });
+assert.strictEqual(t.toDisplayValue(7, C, F), 45);
+assert.deepStrictEqual(t.commitTemperatureText('72.5', 18, setpointOf(C)), { value: 22.5 });
+assert.deepStrictEqual(t.commitTemperatureText('72,5', 18, setpointOf(F)), { value: 73 });
+assert.deepStrictEqual(t.commitTemperatureText('72.', 18, setpointOf(C)), { value: 22 });
+// untouched: the stored string survives a commit of the text it displays
+assert.deepStrictEqual(t.commitTemperatureText('72', '22.3', setpointOf(C)), { value: '22.3' });
+assert.deepStrictEqual(t.commitTemperatureText('', 18, thermostat), { value: '' });
+assert.strictEqual(t.commitTemperatureText('-', 18, thermostat), null);
+// Gauge: a feature with no range is shown over the 0-100 C default as 32-212 F; 19.5 C is 67 F, 77 F is 25 C
+const noRange = t.getUserTemperatureRange(0, 100, C, fUser);
+assert.deepStrictEqual([noRange.min, noRange.max], [32, 212]);
+assert.strictEqual(t.toDisplayValue(19.5, C, F), 67);
+assert.strictEqual(t.fromEditedTemperature(77, 19.5, setpointOf(C, undefined, 0, 100)), 25);
 console.log('OK');

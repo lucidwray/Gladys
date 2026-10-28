@@ -283,4 +283,30 @@ assert.strictEqual(t.fromEditedTemperature(74, 70.5, editor(F)), 74);
 assert.strictEqual(t.fromEditedTemperature(74, '', editor(C)), 23.5);
 assert.strictEqual(t.fromEditedTemperature(74, 20, t.getEditorSetpoint(C, 2, 7, 30)), 24); // feature step 2 C
 assert.strictEqual(t.fromEditedTemperature(90, 20, t.getEditorSetpoint(C, undefined, 7, 30)), 30); // clamped
+// scene summary line: a Fahrenheit user reads a temperature threshold / value in whole F, a formula keeps its form
+const sum = (() => {
+  const summaryOut = path.join(os.tmpdir(), 'summary.check.cjs');
+  buildSync({
+    entryPoints: [path.join(__dirname, '../src/routes/scene/edit-scene/summary.js')],
+    bundle: true,
+    platform: 'node',
+    format: 'cjs',
+    outfile: summaryOut
+  });
+  // eslint-disable-next-line import/no-dynamic-require
+  return require(summaryOut);
+})();
+const fCtx = { user: fUser, units: { 'f-c': C, 'f-f': F, 'f-pct': 'percent' } };
+const trig = (feature, value) => ({ type: 'device.new-state', device_feature: feature, operator: '>=', value });
+const act = (feature, extra) => ({ type: 'device.set-value', device_feature: feature, ...extra });
+assert.strictEqual(sum.getTriggerSummary(trig('f-c', 22.3), {}, fCtx), 'f-c · >= 72 °F');
+assert.strictEqual(sum.getTriggerSummary(trig('f-f', 70.5), {}, fCtx), 'f-f · >= 71 °F');
+assert.strictEqual(sum.getActionSummary(act('f-c', { value: 23.5 }), {}, fCtx), 'f-c · 74 °F');
+assert.strictEqual(sum.getActionSummary(act('f-c', { evaluate_value: '{{x}}' }), {}, fCtx), 'f-c · {{x}}');
+// no change for a Celsius user, units not loaded yet, a non-temperature feature
+[undefined, { user: cUser, units: fCtx.units }, { user: fUser, units: null }].forEach(ctx => {
+  assert.strictEqual(sum.getTriggerSummary(trig('f-c', 22.3), {}, ctx), 'f-c · >= 22.3');
+  assert.strictEqual(sum.getActionSummary(act('f-c', { value: 23.5 }), {}, ctx), 'f-c · 23.5');
+});
+assert.strictEqual(sum.getTriggerSummary(trig('f-pct', 40), {}, fCtx), 'f-pct · >= 40');
 console.log('OK');

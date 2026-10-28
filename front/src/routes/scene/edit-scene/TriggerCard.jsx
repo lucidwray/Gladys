@@ -22,6 +22,7 @@ import { SCENE_DECLARATION_KINDS, getSceneDeclarationTitle } from './sceneIntegr
 import { EVENTS } from '../../../../../server/utils/constants';
 import { TRIGGER_ICON, TRIGGER_COLOR, COLOR_CLASS } from './typesCatalog';
 import { getTriggerSummary } from './summary';
+import { useFeatureUnitsForFahrenheitUser } from '../../../utils/hawrayFeatureUnits';
 import withIntlAsProp from '../../../utils/withIntlAsProp';
 import style from './style.css';
 import GladysStartTrigger from './triggers/GladysStartTrigger';
@@ -48,7 +49,14 @@ const TriggerCard = ({ children, ...props }) => {
   const toggleExpanded = useCallback(() => {
     setExpanded(previousExpanded => !previousExpanded);
   }, []);
-  const summary = !expanded ? getTriggerSummary(props.trigger, props.intl.dictionary) : null;
+  const featureUnits = useFeatureUnitsForFahrenheitUser(
+    props.httpClient,
+    props.user,
+    props.trigger.type === EVENTS.DEVICE.NEW_STATE
+  );
+  const summary = !expanded
+    ? getTriggerSummary(props.trigger, props.intl.dictionary, { user: props.user, units: featureUnits })
+    : null;
   // a trigger declared by an external integration is titled by its manifest
   // label; an orphan one (uninstalled, key removed) keeps the generic label
   const declarationTitle =
@@ -237,4 +245,4 @@ const TriggerCard = ({ children, ...props }) => {
   );
 };
 
-export default connect('user', {})(withIntlAsProp(TriggerCard));
+export default connect('user,httpClient', {})(withIntlAsProp(TriggerCard));

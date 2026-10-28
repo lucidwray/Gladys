@@ -37,9 +37,10 @@ async function runCheck() {
     where: { active: true },
     attributes: ['triggers'],
   });
-  // the triggers column is NOT NULL: every scene carries an array
+  // the live triggers column allows NULL (some active scenes on existing
+  // installs hold NULL): a NULL means no trigger, so it is read as []
   const someSceneListens = activeScenes.some((scene) =>
-    scene.triggers.some(
+    (scene.triggers || []).some(
       (trigger) => trigger.type === EVENTS.WEATHER.ALERT_RAISED || trigger.type === EVENTS.WEATHER.ALERT_ENDED,
     ),
   );

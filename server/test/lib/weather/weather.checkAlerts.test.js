@@ -180,6 +180,47 @@ describe('weather.checkAlerts', () => {
     expect(triggerCheckCalls(event)).to.have.lengthOf(1);
   });
 
+  // a scene whose triggers column is NULL (legacy rows on existing installs):
+  // the model validator only runs on non-null values, so NULL can be stored
+  const createNullTriggersScene = async (name) => {
+    const nullScene = await db.Scene.create({ name, icon: 'fe-bell', active: true, triggers: [], actions: [[]] });
+    await db.sequelize.query('UPDATE t_scene SET triggers = NULL WHERE id = :id', {
+      replacements: { id: nullScene.id },
+    });
+  };
+
+  it('should not throw on an active scene with NULL triggers and still check the houses', async () => {
+    // the listening scene is deactivated first and a NULL-triggers scene is
+    // inserted before a new listening scene: the NULL row is read first
+    await db.Scene.update({ active: false }, { where: { id: scene.id } });
+    await createNullTriggersScene('Null triggers scene test');
+    await db.Scene.create({
+      name: 'Weather alert scene test 2',
+      icon: 'fe-bell',
+      active: true,
+      triggers: [{ type: EVENTS.WEATHER.ALERT_RAISED, house: HOUSE.selector, weather_alert_type: 'any' }],
+      actions: [[]],
+    });
+    const { weather, provider } = buildWeather([{ alerts: [] }]);
+    await weather.checkAlerts();
+    expect(provider.weather.get.callCount).to.equal(1);
+  });
+
+  it('should check the houses when a NULL-triggers scene sits next to a listening scene', async () => {
+    await createNullTriggersScene('Null triggers scene test');
+    const { weather, provider } = buildWeather([{ alerts: [] }]);
+    await weather.checkAlerts();
+    expect(provider.weather.get.callCount).to.equal(1);
+  });
+
+  it('should return early without any provider call when only NULL-triggers scenes are active', async () => {
+    await db.Scene.update({ active: false }, { where: { id: scene.id } });
+    await createNullTriggersScene('Null triggers scene test');
+    const { weather, provider } = buildWeather([{ alerts: [] }]);
+    await weather.checkAlerts();
+    expect(provider.weather.get.callCount).to.equal(0);
+  });
+
   it('should keep the previous baseline when the provider fails', async () => {
     const alert = { severity: 'severe', event: 'Orages', type: 'thunderstorm' };
     const { weather, event, provider } = buildWeather([

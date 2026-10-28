@@ -13,6 +13,7 @@ import {
   WEBSOCKET_MESSAGE_TYPES
 } from '../../../../../server/utils/constants';
 import { celsiusToFahrenheit } from '../../../../../server/utils/units';
+import { formatTemperature } from '../../../utils/hawrayTemperature';
 
 const isNotNullOrUndefined = value => value !== undefined && value !== null;
 
@@ -45,7 +46,7 @@ const RoomTemperatureBox = ({ children, ...props }) => (
       <div>
         {isNotNullOrUndefined(props.temperature) && (
           <h4 class={cx('m-0', tileStyle.tileValue)}>
-            <Text id="global.degreeValue" fields={{ value: Number(props.temperature).toFixed(1) }} />
+            <Text id="global.degreeValue" fields={{ value: formatTemperature(props.temperature, props.unit) }} />
             <Text id={`global.${props.unit}`} />
           </h4>
         )}

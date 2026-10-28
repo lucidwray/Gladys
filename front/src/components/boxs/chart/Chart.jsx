@@ -13,6 +13,14 @@ import withIntlAsProp from '../../../utils/withIntlAsProp';
 import ApexChartComponent from './ApexChartComponent';
 import { getDeviceName } from '../../../utils/device';
 import { formatHttpError } from '../../../utils/formatErrors';
+import { yAxisFormatter } from './yAxisFormatter';
+import {
+  convertTemperature,
+  formatFahrenheitAxisTick,
+  formatWholeFahrenheitReading,
+  prefersFahrenheit,
+  showsWholeFahrenheit
+} from '../../../utils/hawrayTemperature';
 
 dayjs.extend(localizedFormat);
 
@@ -104,7 +112,8 @@ const allEqual = arr => arr.every(val => val === arr[0]);
 // from the per-series summaries, ignoring the series hidden by the user in the chart legend.
 // The variation is the one of the averaged value, so the two numbers describe the same thing:
 // "the average of the visible series is now X, that is Y% more/less than at the start of the period".
-const getHeaderValues = (featuresSummary, hiddenSeriesIndexes) => {
+// A last value in Fahrenheit is whole degrees, any other unit keeps up to 2 decimals.
+const getHeaderValues = (featuresSummary, hiddenSeriesIndexes, isFahrenheit) => {
   const visibleSummaries = featuresSummary.filter(
     (summary, index) => summary !== null && !hiddenSeriesIndexes.includes(index)
   );
@@ -115,8 +124,28 @@ const getHeaderValues = (featuresSummary, hiddenSeriesIndexes) => {
   const lastValue = average(visibleSummaries.map(summary => summary.lastValue));
   return {
     variation: calculateVariation(firstValue, lastValue),
-    lastValueRounded: roundWith2DecimalIfNeeded(lastValue)
+    lastValueRounded: isFahrenheit ? Math.round(lastValue) : roundWith2DecimalIfNeeded(lastValue)
   };
+};
+
+// The value formatters of a Fahrenheit user's chart, or null when no series is a temperature (or the user does not
+// prefer Fahrenheit): the chart then keeps its own. The tooltip of a temperature series reads whole degrees, any other
+// series keeps the default text. The axis is shared by every series, so it only gets the Fahrenheit ticks (see
+// formatFahrenheitAxisTick) when all of them are temperatures. Built once per data load, so a re-render of the box
+// does not look like a new formatter to ApexChartComponent.
+const getWholeFahrenheitFormatters = (units, user) => {
+  const fahrenheitSeries = units.map(unit => showsWholeFahrenheit(unit, user));
+  if (!fahrenheitSeries.includes(true)) {
+    return null;
+  }
+  const formatters = {
+    tooltip_y_formatter: (value, opts) =>
+      fahrenheitSeries[opts && opts.seriesIndex] ? formatWholeFahrenheitReading(value) : yAxisFormatter(value)
+  };
+  if (!fahrenheitSeries.includes(false)) {
+    formatters.y_axis_formatter = formatFahrenheitAxisTick;
+  }
+  return formatters;
 };
 
 const getPeriodLabel = (interval, offset, language) => {
@@ -354,7 +383,11 @@ class Chartbox extends Component {
           const oneUnit = unitsByFeature[index];
           // Convert unit display format if necessary (using 0 as a dummy value since we only need the unit)
           const userUnitPreference = this.props.user.distance_unit_preference;
-          const { unit: displayUnit } = checkAndConvertUnit(0, oneUnit, userUnitPreference);
+          // A Fahrenheit user reads a temperature series in Fahrenheit, whatever unit the feature holds it in
+          const seriesInFahrenheit = showsWholeFahrenheit(oneUnit, this.props.user);
+          const { unit: displayUnit } = seriesInFahrenheit
+            ? { unit: DEVICE_FEATURE_UNITS.FAHRENHEIT }
+            : checkAndConvertUnit(0, oneUnit, userUnitPreference);
 
           const oneUnitTranslated = displayUnit ? this.props.intl.dictionary.deviceFeatureUnitShort[displayUnit] : null;
           const { values, deviceFeature, device } = oneFeature;
@@ -369,7 +402,9 @@ class Chartbox extends Component {
               const rawValue = getDeviceValueByAggregateFunction(dataPoint, this.props.box.aggregate_function);
 
               // Convert the value if it is a convertible unit
-              const { value: displayValue } = checkAndConvertUnit(rawValue, oneUnit, userUnitPreference);
+              const { value: displayValue } = seriesInFahrenheit
+                ? { value: convertTemperature(rawValue, oneUnit, DEVICE_FEATURE_UNITS.FAHRENHEIT) }
+                : checkAndConvertUnit(rawValue, oneUnit, userUnitPreference);
 
               return [Math.round(new Date(dataPoint.created_at).getTime() / 1000) * 1000, displayValue];
             })
@@ -378,6 +413,10 @@ class Chartbox extends Component {
       }
       const newState = {
         series,
+        valueFormatters:
+          this.props.box.chart_type === 'timeline'
+            ? null
+            : getWholeFahrenheitFormatters(unitsByFeature, this.props.user),
         loading: false,
         initialized: true,
         emptySeries,
@@ -392,6 +431,8 @@ class Chartbox extends Component {
         let displayUnit = unit;
 
         // We check if all deviceFeatures selected are in the same unit
+        // The header of a temperature is read in whole degrees Fahrenheit by a Fahrenheit user, like the series
+        const showsFahrenheit = showsWholeFahrenheit(unit, this.props.user);
         const allUnitsAreSame = this.props.box.units ? allEqual(unitsByFeature) : false;
 
         // First and last value of the period for each feature (one entry per series, in the same
@@ -419,13 +460,23 @@ class Chartbox extends Component {
           );
           const { value: lastValue } = checkAndConvertUnit(rawLastValue, unit, userUnitPreference);
           displayUnit = firstElementUnit;
+          if (showsFahrenheit) {
+            return {
+              firstValue: convertTemperature(firstValue, unit, DEVICE_FEATURE_UNITS.FAHRENHEIT),
+              lastValue: convertTemperature(lastValue, unit, DEVICE_FEATURE_UNITS.FAHRENHEIT)
+            };
+          }
           return { firstValue, lastValue };
         });
+        if (showsFahrenheit) {
+          displayUnit = DEVICE_FEATURE_UNITS.FAHRENHEIT;
+        }
 
         newState.featuresSummary = featuresSummary;
+        newState.wholeDegrees = showsFahrenheit;
         newState.variationDownIsPositive = UNITS_WHEN_DOWN_IS_POSITIVE.includes(displayUnit);
         newState.unit = displayUnit;
-        Object.assign(newState, getHeaderValues(featuresSummary, this.state.hiddenSeriesIndexes));
+        Object.assign(newState, getHeaderValues(featuresSummary, this.state.hiddenSeriesIndexes, showsFahrenheit));
       }
       await this.setState(newState);
     } catch (e) {
@@ -460,7 +511,7 @@ class Chartbox extends Component {
       }
       return {
         hiddenSeriesIndexes,
-        ...getHeaderValues(prevState.featuresSummary, hiddenSeriesIndexes)
+        ...getHeaderValues(prevState.featuresSummary, hiddenSeriesIndexes, prevState.wholeDegrees)
       };
     });
   };
@@ -498,10 +549,13 @@ class Chartbox extends Component {
     const deviceFeaturesChanged = get(previousProps, 'box.device_features') !== get(this.props, 'box.device_features');
     const titleChanged = get(previousProps, 'box.title') !== get(this.props, 'box.title');
     const unitChanged = get(previousProps, 'box.unit') !== get(this.props, 'box.unit');
+    // The user preference arrives from /api/v1/me after the first render, in parallel with the chart data: when it
+    // turns to (or from) Fahrenheit, the series and the header are computed again in that unit
+    const wholeFahrenheitChanged = prefersFahrenheit(previousProps.user) !== prefersFahrenheit(this.props.user);
     if (intervalChanged) {
       await this.updateInterval(this.props.box.interval);
     }
-    if (intervalChanged || deviceFeaturesChanged || titleChanged || unitChanged) {
+    if (intervalChanged || deviceFeaturesChanged || titleChanged || unitChanged || wholeFahrenheitChanged) {
       this.getData();
     }
   }
@@ -530,7 +584,8 @@ class Chartbox extends Component {
       unit,
       nbFeaturesDisplayed,
       error,
-      errorDetail
+      errorDetail,
+      valueFormatters
     }
   ) {
     const { box } = this.props;
@@ -769,7 +824,7 @@ class Chartbox extends Component {
               {emptySeries === false && props.box.display_axes && (
                 <div class="mt-4">
                   <ApexChartComponent
-                    key={deviceFeaturesKey}
+                    key={valueFormatters ? `${deviceFeaturesKey}:fahrenheit` : deviceFeaturesKey}
                     series={series}
                     interval={interval}
                     user={props.user}
@@ -780,6 +835,7 @@ class Chartbox extends Component {
                     additionalHeight={additionalHeight}
                     dictionary={props.intl.dictionary}
                     onHiddenSeriesChange={this.handleHiddenSeriesChange}
+                    {...valueFormatters}
                   />
                 </div>
               )}
@@ -832,7 +888,7 @@ class Chartbox extends Component {
                 )}
                 {emptySeries === false && !props.box.display_axes && (
                   <ApexChartComponent
-                    key={deviceFeaturesKey}
+                    key={valueFormatters ? `${deviceFeaturesKey}:fahrenheit` : deviceFeaturesKey}
                     series={series}
                     interval={interval}
                     user={props.user}
@@ -843,6 +899,7 @@ class Chartbox extends Component {
                     additionalHeight={additionalHeight}
                     dictionary={props.intl.dictionary}
                     onHiddenSeriesChange={this.handleHiddenSeriesChange}
+                    {...valueFormatters}
                   />
                 )}
               </div>

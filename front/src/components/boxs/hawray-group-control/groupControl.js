@@ -213,14 +213,20 @@ const getUnionOfBounds = (members, groupUnit) => {
   };
 };
 
+// A Fahrenheit user steps a Celsius temperature by whole degrees Fahrenheit, which only land on a half degree
+// Celsius grid. A Celsius feature with no step of its own gets that grid for this user; for any other user it has none.
+const getWholeFahrenheitStep = (feature, userUnit) =>
+  userUnit === DEVICE_FEATURE_UNITS.FAHRENHEIT && feature.unit === DEVICE_FEATURE_UNITS.CELSIUS ? 0.5 : undefined;
+
 // Builds the one virtual feature standing for a group of same-type members. The category, type,
 // step and unit come from the first member; the bounds are the first member's, except for physical
 // groups (see getUnionOfBounds). The value is the aggregate.
-const aggregateGroup = members => {
+const aggregateGroup = (members, userUnit) => {
   const [first] = members;
   const key = getFeatureKey(first);
   const supportedOptions = getCommonSupportedOptions(members);
   const kind = getAggregateKind(first);
+  const groupStep = first.step || getWholeFahrenheitStep(first, userUnit);
   const bounds =
     kind === AGGREGATE_KIND.PHYSICAL ? getUnionOfBounds(members, first.unit) : { min: first.min, max: first.max };
   const feature = {
@@ -232,7 +238,7 @@ const aggregateGroup = members => {
     unit: first.unit,
     min: bounds.min,
     max: bounds.max,
-    step: first.step,
+    step: groupStep,
     read_only: false,
     ...(supportedOptions ? { supported_options: supportedOptions } : {})
   };
@@ -272,7 +278,7 @@ const aggregateGroup = members => {
     return {
       ...feature,
       // Clamped to the union of the members' bounds, the same range the group slider offers
-      last_value: clampToBounds(roundToStep(total / known.length, first.step), feature),
+      last_value: clampToBounds(roundToStep(total / known.length, groupStep), feature),
       last_value_changed: getLastChanged(known).last_value_changed
     };
   }
@@ -308,10 +314,12 @@ const aggregateGroup = members => {
 /**
  * @description Builds the virtual features of a group: one feature per type, aggregated from its members.
  * @param {Array} members - The member features, each carrying its device, in the box order.
+ * @param {string} userUnit - The temperature unit the user prefers.
  * @returns {Array} The virtual features, in the order their types first appear in the box.
- * @example buildGroupFeatures(members);
+ * @example buildGroupFeatures(members, 'fahrenheit');
  */
-export const buildGroupFeatures = members => groupMembersByType(members).map(aggregateGroup);
+export const buildGroupFeatures = (members, userUnit) =>
+  groupMembersByType(members).map(groupMembers => aggregateGroup(groupMembers, userUnit));
 
 /**
  * @description Converts a value written on the group into the value each member receives.
@@ -319,9 +327,10 @@ export const buildGroupFeatures = members => groupMembersByType(members).map(agg
  * @param {object} groupFeature - The virtual feature the value is written on.
  * @param {string} kind - The aggregate kind of the group.
  * @param {number} value - The value written, in the group scale.
+ * @param {string} userUnit - The temperature unit the user prefers.
  * @returns {number} The value to send to the member.
  */
-const getMemberValue = (member, groupFeature, kind, value) => {
+const getMemberValue = (member, groupFeature, kind, value, userUnit) => {
   if (kind === AGGREGATE_KIND.RELATIVE) {
     return roundToStep(scaleToRange(value, getRange(groupFeature), getRange(member)), member.step);
   }
@@ -329,8 +338,12 @@ const getMemberValue = (member, groupFeature, kind, value) => {
     const kelvin = temperatureValueToKelvin(groupFeature, value);
     return clampToBounds(roundToStep(kelvinToTemperatureValue(member, kelvin), member.step), member);
   }
-  // A physical value written on the group is in the group's unit: moved onto the member's own unit first
-  return clampToBounds(roundToStep(convertTemperature(value, groupFeature.unit, member.unit), member.step), member);
+  // A physical value written on the group is in the group's unit: moved onto the member's own unit first.
+  // For a Fahrenheit user, a Celsius member with no step of its own lands on half degrees like a thermostat, whatever
+  // the group's unit: rounding a whole degree Fahrenheit to a whole degree Celsius would move it almost 2 F. Any other
+  // user keeps the member's own step, as upstream does (a stepless member rounds to whole units).
+  const memberStep = member.step || getWholeFahrenheitStep(member, userUnit);
+  return clampToBounds(roundToStep(convertTemperature(value, groupFeature.unit, member.unit), memberStep), member);
 };
 
 /**
@@ -341,10 +354,11 @@ const getMemberValue = (member, groupFeature, kind, value) => {
  * @param {Array} members - The member features of the group.
  * @param {object} groupFeature - The virtual feature the value is written on.
  * @param {number|string} value - The value written, in the group feature scale.
+ * @param {string} userUnit - The temperature unit the user prefers.
  * @returns {Array} One { selector, value } per member of the same type.
- * @example planGroupWrites(members, groupFeature, 50);
+ * @example planGroupWrites(members, groupFeature, 50, 'celsius');
  */
-export const planGroupWrites = (members, groupFeature, value) => {
+export const planGroupWrites = (members, groupFeature, value, userUnit) => {
   const kind = getAggregateKind(groupFeature);
   const groupKey = getFeatureKey(groupFeature);
   const numericValue = Number(value);
@@ -355,7 +369,7 @@ export const planGroupWrites = (members, groupFeature, value) => {
       value:
         kind === AGGREGATE_KIND.BINARY || kind === AGGREGATE_KIND.LATEST
           ? value
-          : getMemberValue(member, groupFeature, kind, numericValue)
+          : getMemberValue(member, groupFeature, kind, numericValue, userUnit)
     }));
 };
 

@@ -1,4 +1,5 @@
 import { Text } from 'preact-i18n';
+import { connect } from 'unistore/preact';
 import get from 'get-value';
 
 import {
@@ -7,6 +8,7 @@ import {
   OPENING_SENSOR_STATE
 } from '../../../../server/utils/constants';
 import withIntlAsProp from '../../utils/withIntlAsProp';
+import { getUserTemperatureDisplay } from '../../utils/hawrayTemperature';
 
 const roundValue = value => Math.round(value * 10) / 10;
 
@@ -14,7 +16,7 @@ const roundValue = value => Math.round(value * 10) / 10;
 // that display a state inline (chips bar, scene status subtitle, house-view
 // pins). Enum values (vacuum state, shutter state, thermostat mode…) resolve
 // through the app's existing per-category value labels.
-const DeviceFeatureValueText = ({ feature, intl }) => {
+const DeviceFeatureValueText = ({ feature, intl, user }) => {
   if (!feature || feature.last_value === null || feature.last_value === undefined) {
     return <Text id="deviceFeatureValueText.noValue" />;
   }
@@ -32,6 +34,15 @@ const DeviceFeatureValueText = ({ feature, intl }) => {
   if (feature.type === DEVICE_FEATURE_TYPES.SENSOR.BINARY || feature.type === DEVICE_FEATURE_TYPES.LIGHT.BINARY) {
     return feature.last_value ? <Text id="deviceFeatureValueText.on" /> : <Text id="deviceFeatureValueText.off" />;
   }
+  // A Fahrenheit user reads a temperature in whole degrees Fahrenheit, converted from the feature's own unit
+  const temperature = getUserTemperatureDisplay(feature.last_value, feature.unit, user);
+  if (temperature) {
+    return (
+      <span>
+        {temperature.value} <Text id={`deviceFeatureUnitShort.${temperature.unit}`} />
+      </span>
+    );
+  }
   return (
     <span>
       {roundValue(feature.last_value)}
@@ -45,4 +56,4 @@ const DeviceFeatureValueText = ({ feature, intl }) => {
   );
 };
 
-export default withIntlAsProp(DeviceFeatureValueText);
+export default connect('user', {})(withIntlAsProp(DeviceFeatureValueText));

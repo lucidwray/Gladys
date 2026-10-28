@@ -12,6 +12,7 @@ import {
   getSignalQualityIcon,
   getSignalQualityLevel
 } from '../../utils/signalQuality';
+import { getUserTemperatureDisplay } from '../../utils/hawrayTemperature';
 import { getGroupOfCategory } from './categoryGroups';
 import style from './style.css';
 
@@ -31,7 +32,7 @@ const getSignalFeatureBounds = (event, featuresBySelector) => {
   return { min, max };
 };
 
-const EventValue = ({ event, intl, featuresBySelector }) => {
+const EventValue = ({ event, intl, featuresBySelector, user }) => {
   const { category, type, unit } = event.device_feature;
   const value = event.value;
   const dictionary = get(intl, 'dictionary', { default: {} });
@@ -80,6 +81,20 @@ const EventValue = ({ event, intl, featuresBySelector }) => {
     }
   }
 
+  // A Fahrenheit user reads a temperature event in whole degrees Fahrenheit, converted from the feature's own unit
+  const temperature = getUserTemperatureDisplay(value, unit, user);
+  if (temperature) {
+    return (
+      <span>
+        {temperature.value}
+        <span>
+          {' '}
+          <Text id={`deviceFeatureUnitShort.${temperature.unit}`} />
+        </span>
+      </span>
+    );
+  }
+
   return (
     <span>
       {roundValue(value)}
@@ -93,7 +108,7 @@ const EventValue = ({ event, intl, featuresBySelector }) => {
   );
 };
 
-const EventLine = ({ eventGroup, intl, toggleExpand, expanded, featuresBySelector }) => {
+const EventLine = ({ eventGroup, intl, toggleExpand, expanded, featuresBySelector, user }) => {
   const event = eventGroup.events[0];
   const { category, type } = event.device_feature;
   const group = getGroupOfCategory(category);
@@ -109,7 +124,7 @@ const EventLine = ({ eventGroup, intl, toggleExpand, expanded, featuresBySelecto
         <div class={style.eventText}>
           <span class={style.eventDeviceName}>{event.device.name}</span>
           <span class={cx(style.eventValue, style[`eventValue-${group.colorClass}`])}>
-            <EventValue event={event} intl={intl} featuresBySelector={featuresBySelector} />
+            <EventValue event={event} intl={intl} featuresBySelector={featuresBySelector} user={user} />
           </span>
           {count > 1 && (
             <button type="button" class={cx('btn', style.eventCountBadge)} onClick={toggleExpand}>
@@ -132,7 +147,7 @@ const EventLine = ({ eventGroup, intl, toggleExpand, expanded, featuresBySelecto
               <div class={style.eventOccurrence}>
                 <span class={style.eventOccurrenceTime}>{dayjs(oneEvent.created_at).format('HH:mm:ss')}</span>
                 <span>
-                  <EventValue event={oneEvent} intl={intl} featuresBySelector={featuresBySelector} />
+                  <EventValue event={oneEvent} intl={intl} featuresBySelector={featuresBySelector} user={user} />
                 </span>
               </div>
             ))}

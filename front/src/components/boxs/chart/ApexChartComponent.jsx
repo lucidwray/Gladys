@@ -219,6 +219,16 @@ class ApexChartComponent extends Component {
     this.addDateFormatterRangeBar(options);
     return options;
   };
+  // The value formatters a caller passes (a Fahrenheit user's temperature chart, see Chart.jsx) on a line, area or
+  // step line chart; the bar chart applies its own in getBarChartOptions. Without them the options are left as built.
+  addValueFormatters(options) {
+    if (this.props.y_axis_formatter && options.yaxis && options.yaxis.labels) {
+      options.yaxis.labels.formatter = this.props.y_axis_formatter;
+    }
+    if (this.props.tooltip_y_formatter) {
+      options.tooltip = { ...options.tooltip, y: { formatter: this.props.tooltip_y_formatter } };
+    }
+  }
   displayChart = () => {
     let options;
     if (this.props.chart_type === 'timeline') {
@@ -233,6 +243,9 @@ class ApexChartComponent extends Component {
       options = this.getBarChartOptions();
     } else {
       options = this.getAreaChartOptions();
+    }
+    if (this.props.chart_type !== 'timeline' && this.props.chart_type !== 'bar') {
+      this.addValueFormatters(options);
     }
     this.addHiddenSeriesEvents(options);
     this.tooltipPositioning.addToOptions(options);
@@ -296,6 +309,7 @@ class ApexChartComponent extends Component {
     const additionalHeightDifferent = nextProps.additionalHeight !== this.props.additionalHeight;
     const yAxisFormatterDifferent = nextProps.y_axis_formatter !== this.props.y_axis_formatter;
     const yAxisUnitDifferent = nextProps.y_axis_unit !== this.props.y_axis_unit;
+    const tooltipYFormatterDifferent = nextProps.tooltip_y_formatter !== this.props.tooltip_y_formatter;
     const colorsDifferent = nextProps.colors !== this.props.colors;
     const annotationsDifferent = nextProps.annotations !== this.props.annotations;
     if (
@@ -308,6 +322,7 @@ class ApexChartComponent extends Component {
       additionalHeightDifferent ||
       yAxisFormatterDifferent ||
       yAxisUnitDifferent ||
+      tooltipYFormatterDifferent ||
       colorsDifferent ||
       annotationsDifferent
     ) {

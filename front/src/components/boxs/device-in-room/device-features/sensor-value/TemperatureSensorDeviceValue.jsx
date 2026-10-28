@@ -1,4 +1,5 @@
 import { Text } from 'preact-i18n';
+import { roundForUnit } from '../../../../../utils/hawrayTemperature';
 import { celsiusToFahrenheit, fahrenheitToCelsius } from '../../../../../../../server/utils/units';
 import { DEVICE_FEATURE_UNITS } from '../../../../../../../server/utils/constants';
 
@@ -16,8 +17,8 @@ const TemperatureSensorDeviceValue = ({ deviceFeature, user }) => {
     }
   }
 
-  // Round to one decimal place
-  value = Math.round(value * 10) / 10;
+  // Round to one decimal place, or to a whole degree for a Fahrenheit user
+  value = roundForUnit(value, userUnit);
 
   return (
     <div>

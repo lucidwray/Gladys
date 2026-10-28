@@ -4,6 +4,7 @@ import { Link } from 'preact-router/match';
 import cx from 'classnames';
 import get from 'get-value';
 import { THERMOSTAT_MODE } from '../../../../../../../server/utils/constants';
+import { prefersFahrenheit, toDisplayValue } from '../../../../../utils/hawrayTemperature';
 import style from './style.css';
 
 class ThermostatDeviceBox extends Component {
@@ -95,6 +96,13 @@ class ThermostatDeviceBox extends Component {
     // device would otherwise display its 70 as 70 °C.
     const featureUnit = setpointFeature && setpointFeature.unit;
     const tempUnitValue = featureUnit === 'fahrenheit' ? 'F' : (unitParam && unitParam.value) || 'C';
+    // A Fahrenheit user reads whole degrees Fahrenheit, converted from the unit the setpoint is held in. Any other
+    // user reads the setpoint as it is held.
+    const isWholeFahrenheit = prefersFahrenheit(props.user);
+    const heldUnit = tempUnitValue === 'F' ? 'fahrenheit' : 'celsius';
+    const setpointText = isWholeFahrenheit
+      ? `${toDisplayValue(setpoint, heldUnit, 'fahrenheit')} °F`
+      : `${setpoint} °${tempUnitValue}`;
 
     return (
       <div class="col-md-6">
@@ -167,7 +175,7 @@ class ThermostatDeviceBox extends Component {
                       ) : setpoint === null ? (
                         <Text id="integration.thermostat.device.noSetpoint" />
                       ) : (
-                        `${setpoint} °${tempUnitValue}`
+                        setpointText
                       )}
                     </span>
                   </div>

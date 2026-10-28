@@ -329,8 +329,12 @@ const getMemberValue = (member, groupFeature, kind, value) => {
     const kelvin = temperatureValueToKelvin(groupFeature, value);
     return clampToBounds(roundToStep(kelvinToTemperatureValue(member, kelvin), member.step), member);
   }
-  // A physical value written on the group is in the group's unit: moved onto the member's own unit first
-  return clampToBounds(roundToStep(convertTemperature(value, groupFeature.unit, member.unit), member.step), member);
+  // A physical value written on the group is in the group's unit: moved onto the member's own unit first.
+  // A Celsius member with no step of its own, written from another unit (a whole degree Fahrenheit), lands
+  // on half degrees like a thermostat; rounding it to a whole degree Celsius would move it almost 2 F.
+  const convertsToCelsius = groupFeature.unit !== member.unit && member.unit === DEVICE_FEATURE_UNITS.CELSIUS;
+  const memberStep = member.step || (convertsToCelsius ? 0.5 : undefined);
+  return clampToBounds(roundToStep(convertTemperature(value, groupFeature.unit, member.unit), memberStep), member);
 };
 
 /**

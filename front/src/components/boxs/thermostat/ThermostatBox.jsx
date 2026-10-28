@@ -21,6 +21,7 @@ import { getPresetColor as presetColorForMode, readableTextOn } from '../../../u
 import CircularGauge from './CircularGauge';
 import { angleToTemp as angleToSetpoint, getAngleFromPointer, isAngleInArc } from './gaugeGeometry';
 import { loadDeviceConfig } from './deviceConfig';
+import { toDisplayBound, toDisplayValue, toFeatureSetpoint } from '../../../utils/hawrayTemperature';
 import { isRunningFromStateFeature } from './operatingState';
 
 const PRESET_ICONS = {
@@ -149,6 +150,24 @@ class ThermostatBox extends Component {
   toDisplayTemp = temp => {
     if (temp === null || temp === undefined) return temp;
     return this.needsFahrenheitConversion() ? celsiusToFahrenheit(temp) : temp;
+  };
+
+  // In Fahrenheit the card works in whole degrees. The unit the setpoint is held in is Celsius when the feature
+  // declares none and the user prefers Fahrenheit (it is shown converted), otherwise Fahrenheit itself.
+  isWholeFahrenheit = () => this.getTempUnit() === 'F';
+  getHeldUnit = () =>
+    this.needsFahrenheitConversion() ? DEVICE_FEATURE_UNITS.CELSIUS : DEVICE_FEATURE_UNITS.FAHRENHEIT;
+
+  // A setpoint moved onto the whole degree Fahrenheit grid, within the device's own bounds. Celsius is untouched.
+  toWholeFahrenheitSetpoint = (temp, deltaDegrees = 0) => {
+    if (!this.isWholeFahrenheit()) return temp;
+    const heldUnit = this.getHeldUnit();
+    return toFeatureSetpoint(toDisplayValue(temp, heldUnit, DEVICE_FEATURE_UNITS.FAHRENHEIT) + deltaDegrees, {
+      featureUnit: heldUnit,
+      displayUnit: DEVICE_FEATURE_UNITS.FAHRENHEIT,
+      min: this.getMinTemp(),
+      max: this.getMaxTemp()
+    });
   };
 
   // The room sensor is a separate device from the thermostat, so it can report a
@@ -1074,7 +1093,8 @@ class ThermostatBox extends Component {
     }
   };
 
-  angleToTemp = angleDeg => angleToSetpoint(angleDeg, this.getMinTemp(), this.getMaxTemp());
+  angleToTemp = angleDeg =>
+    this.toWholeFahrenheitSetpoint(angleToSetpoint(angleDeg, this.getMinTemp(), this.getMaxTemp()));
 
   onPointerDown = e => {
     if (!this.svgRef) return;
@@ -1165,11 +1185,19 @@ class ThermostatBox extends Component {
   };
 
   increment = () => {
+    if (this.isWholeFahrenheit()) {
+      this.stepSetpoint(this.toWholeFahrenheitSetpoint(this.state.setpoint, 1));
+      return;
+    }
     const step = 0.5;
     this.stepSetpoint(Math.min(this.getMaxTemp(), this.state.setpoint + step));
   };
 
   decrement = () => {
+    if (this.isWholeFahrenheit()) {
+      this.stepSetpoint(this.toWholeFahrenheitSetpoint(this.state.setpoint, -1));
+      return;
+    }
     const step = 0.5;
     this.stepSetpoint(Math.max(this.getMinTemp(), this.state.setpoint - step));
   };
@@ -1348,10 +1376,19 @@ class ThermostatBox extends Component {
     const showActive = !isWindowOpen && mode !== 'off' && isRunning;
 
     // Convert temperatures for display
-    const displaySetpoint = this.toDisplayTemp(setpoint);
-    const displayCurrentTemp = this.toDisplayTemp(currentTemp);
-    const displayMinTemp = this.toDisplayTemp(minTemp);
-    const displayMaxTemp = this.toDisplayTemp(maxTemp);
+    // A Fahrenheit card shows whole degrees, its bounds rounded inward
+    const isWholeFahrenheit = this.isWholeFahrenheit();
+    const heldUnit = this.getHeldUnit();
+    const toWholeDegrees = temp =>
+      temp === null || temp === undefined ? temp : toDisplayValue(temp, heldUnit, DEVICE_FEATURE_UNITS.FAHRENHEIT);
+    const displaySetpoint = isWholeFahrenheit ? toWholeDegrees(setpoint) : this.toDisplayTemp(setpoint);
+    const displayCurrentTemp = isWholeFahrenheit ? toWholeDegrees(currentTemp) : this.toDisplayTemp(currentTemp);
+    const displayMinTemp = isWholeFahrenheit
+      ? toDisplayBound(minTemp, heldUnit, DEVICE_FEATURE_UNITS.FAHRENHEIT, false)
+      : this.toDisplayTemp(minTemp);
+    const displayMaxTemp = isWholeFahrenheit
+      ? toDisplayBound(maxTemp, heldUnit, DEVICE_FEATURE_UNITS.FAHRENHEIT, true)
+      : this.toDisplayTemp(maxTemp);
     const tempUnit = this.getTempUnit();
 
     return (

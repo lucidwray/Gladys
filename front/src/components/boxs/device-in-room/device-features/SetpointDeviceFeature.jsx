@@ -6,11 +6,11 @@ import { DeviceFeatureCategoriesIcon } from '../../../../utils/consts';
 import { DEVICE_FEATURE_CATEGORIES, DEVICE_FEATURE_UNITS } from '../../../../../../server/utils/constants';
 import { decimalsOf } from '../../../../../../server/utils/units';
 import {
-  convertTemperature,
   getDisplayStep,
   isTemperatureUnit,
-  roundDisplayValue,
   stepSetpoint,
+  toDisplayBound,
+  toDisplayValue,
   toFeatureSetpoint
 } from '../../../../utils/hawrayTemperature';
 
@@ -53,6 +53,9 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
   const userUnit = props.user && props.user.temperature_unit_preference;
   const isConverted = isTemperatureUnit(featureUnit) && isTemperatureUnit(userUnit) && userUnit !== featureUnit;
   const displayUnit = isConverted ? userUnit : featureUnit;
+  // A Fahrenheit user gets whole degrees on every temperature setpoint, whatever unit the feature is held in
+  const isWholeFahrenheit = isTemperatureUnit(featureUnit) && userUnit === DEVICE_FEATURE_UNITS.FAHRENHEIT;
+  const usesTemperatureMath = isConverted || isWholeFahrenheit;
   const setpoint = {
     featureUnit,
     displayUnit: userUnit,
@@ -62,14 +65,14 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
   };
   // The step the buttons move by, in the displayed unit: a whole degree Fahrenheit, otherwise the step above
   const DEFAULT_DISPLAY_STEP = userUnit === DEVICE_FEATURE_UNITS.FAHRENHEIT ? 1 : SETPOINT_STEP;
-  const displayStep = isConverted ? getDisplayStep(setpoint, DEFAULT_DISPLAY_STEP) : SETPOINT_STEP;
+  const displayStep = usesTemperatureMath ? getDisplayStep(setpoint, DEFAULT_DISPLAY_STEP) : SETPOINT_STEP;
 
-  const toDisplayBound = bound =>
-    isConverted && Number.isFinite(bound) ? convertTemperature(bound, featureUnit, userUnit) : bound;
+  const toDisplayLimit = (bound, isMax) =>
+    usesTemperatureMath ? toDisplayBound(bound, featureUnit, userUnit, isMax) : bound;
 
   const displayValue =
-    isConverted && !isNullOrUndefined(props.deviceFeature.last_value)
-      ? roundDisplayValue(convertTemperature(props.deviceFeature.last_value, featureUnit, userUnit))
+    usesTemperatureMath && !isNullOrUndefined(props.deviceFeature.last_value)
+      ? toDisplayValue(props.deviceFeature.last_value, featureUnit, userUnit)
       : props.deviceFeature.last_value;
 
   function updateValue(value) {
@@ -78,7 +81,7 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
 
   function updateValueEvent(e) {
     const typed = Number(e.target.value);
-    if (isConverted && e.target.value !== '' && Number.isFinite(typed)) {
+    if (usesTemperatureMath && e.target.value !== '' && Number.isFinite(typed)) {
       updateValue(toFeatureSetpoint(typed, setpoint));
       return;
     }
@@ -89,7 +92,7 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
     const prevValue = isNullOrUndefined(props.deviceFeature.last_value)
       ? DEFAULT_VALUE_IN_CASE_EMPTY
       : props.deviceFeature.last_value;
-    if (isConverted) {
+    if (usesTemperatureMath) {
       updateValue(stepSetpoint(prevValue, 1, setpoint, DEFAULT_DISPLAY_STEP));
       return;
     }
@@ -100,7 +103,7 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
     const prevValue = isNullOrUndefined(props.deviceFeature.last_value)
       ? DEFAULT_VALUE_IN_CASE_EMPTY
       : props.deviceFeature.last_value;
-    if (isConverted) {
+    if (usesTemperatureMath) {
       updateValue(stepSetpoint(prevValue, -1, setpoint, DEFAULT_DISPLAY_STEP));
       return;
     }
@@ -138,9 +141,9 @@ const SetpointDeviceFeature = ({ children, ...props }) => {
               value={displayValue}
               class={cx('form-control text-center', style.removeNumberArrow, style.setpointValue)}
               onChange={updateValueEvent}
-              step={isConverted ? displayStep : SETPOINT_STEP}
-              min={toDisplayBound(props.deviceFeature.min)}
-              max={toDisplayBound(props.deviceFeature.max)}
+              step={usesTemperatureMath ? displayStep : SETPOINT_STEP}
+              min={toDisplayLimit(props.deviceFeature.min, false)}
+              max={toDisplayLimit(props.deviceFeature.max, true)}
             />
             {isTemperatureUnit(displayUnit) && (
               <div class="input-group-append">

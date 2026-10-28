@@ -167,7 +167,7 @@ class ThermostatDeviceBox extends Component {
                       ) : setpoint === null ? (
                         <Text id="integration.thermostat.device.noSetpoint" />
                       ) : (
-                        `${setpoint} °${tempUnitValue}`
+                        `${tempUnitValue === 'F' ? Math.round(setpoint) : setpoint} °${tempUnitValue}`
                       )}
                     </span>
                   </div>

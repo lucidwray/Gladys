@@ -1,8 +1,13 @@
 import dayjs from 'dayjs';
 import get from 'get-value';
 
-import { DEVICE_FEATURE_CATEGORIES, DEVICE_FEATURE_TYPES } from '../../../../server/utils/constants';
+import {
+  DEVICE_FEATURE_CATEGORIES,
+  DEVICE_FEATURE_TYPES,
+  DEVICE_FEATURE_UNITS
+} from '../../../../server/utils/constants';
 import { checkAndConvertUnit } from '../../../../server/utils/units';
+import { isTemperatureUnit, toDisplayValue } from '../../utils/hawrayTemperature';
 
 export const BINARY_TYPE = DEVICE_FEATURE_TYPES.LIGHT.BINARY;
 const BRIGHTNESS_TYPE = DEVICE_FEATURE_TYPES.LIGHT.BRIGHTNESS;
@@ -108,6 +113,12 @@ export const formatFeatureValue = (feature, { user, dictionary }) => {
   }
   if (isBinaryFeature(feature)) {
     return get(dictionary, feature.last_value === 1 ? 'deviceFeatureValueText.on' : 'deviceFeatureValueText.off');
+  }
+  // A temperature is shown in whole degrees when the user prefers Fahrenheit
+  if (isTemperatureUnit(feature.unit) && user && user.temperature_unit_preference === DEVICE_FEATURE_UNITS.FAHRENHEIT) {
+    const shortFahrenheit = get(dictionary, `deviceFeatureUnitShort.${DEVICE_FEATURE_UNITS.FAHRENHEIT}`);
+    const wholeValue = toDisplayValue(feature.last_value, feature.unit, DEVICE_FEATURE_UNITS.FAHRENHEIT);
+    return shortFahrenheit ? `${wholeValue} ${shortFahrenheit}` : `${wholeValue}`;
   }
   const { value, unit } = checkAndConvertUnit(feature.last_value, feature.unit, user && user.distance_unit_preference);
   const shortUnit = unit ? get(dictionary, `deviceFeatureUnitShort.${unit}`) : null;

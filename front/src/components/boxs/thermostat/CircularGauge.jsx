@@ -1,4 +1,5 @@
 import style from './style.css';
+import { formatTemperature } from '../../../utils/hawrayTemperature';
 
 // The gauge is drawn as an SVG arc spanning ARC_DEGREES, opening at the bottom:
 // it starts at ARC_START_ANGLE (150°, lower-left) and sweeps clockwise.
@@ -64,14 +65,16 @@ const CircularGauge = ({
   // Derive both halves from one rounded value: splitting the raw setpoint made
   // 20.96 render as "20.10" (the decimal carried to 10) and -3.5 as "-4.5"
   // (floor rounds away from zero for negatives).
-  const roundedSetpoint = Math.round(setpoint * 10) / 10;
+  // A Fahrenheit setpoint is whole degrees: no decimal is drawn, and the group centres on the integer and the unit.
+  const isWholeDegrees = tempUnit === 'F';
+  const roundedSetpoint = isWholeDegrees ? Math.round(setpoint) : Math.round(setpoint * 10) / 10;
   const truncated = Math.trunc(roundedSetpoint);
   const decPart = Math.round(Math.abs(roundedSetpoint - truncated) * 10);
   // Math.trunc(-0.5) is -0, which renders as "0": a setpoint between -1 and 0
   // would lose its sign, so the minus is restored explicitly.
   const intPart = truncated === 0 && roundedSetpoint < 0 ? '-0' : String(truncated);
   const intW = intPart.length * 30;
-  const intX = cx - intW / 2 - 18;
+  const intX = cx - intW / 2 - (isWholeDegrees ? 8 : 18);
   const suffixX = intX + intW;
 
   const hasCurrentTemp = currentTemp !== null && currentTemp !== undefined;
@@ -92,7 +95,10 @@ const CircularGauge = ({
   const label = [
     isOff ? offLabel : `${a11yLabels.setpoint || 'Setpoint'} ${roundedSetpoint} ${unit}`,
     hasCurrentTemp
-      ? `${a11yLabels.currentTemp || 'Current temperature'} ${Number(currentTemp).toFixed(1)} ${unit}`
+      ? `${a11yLabels.currentTemp || 'Current temperature'} ${formatTemperature(
+          currentTemp,
+          tempUnit === 'F' ? 'fahrenheit' : 'celsius'
+        )} ${unit}`
       : null,
     hasHumidity ? `${a11yLabels.humidity || 'Humidity'} ${Math.round(humidity)} %` : null,
     isWindowOpen ? a11yLabels.windowOpen || null : null
@@ -173,7 +179,10 @@ const CircularGauge = ({
           <tspan class={`${style.gaugeIconGlyph} ${style.currentTempIcon}`} dy="-0.08em">
             {ICONS.thermometer}
           </tspan>
-          <tspan dy="0.08em">{` ${Number(currentTemp).toFixed(1)} °${tempUnit || 'C'}`}</tspan>
+          <tspan dy="0.08em">{` ${formatTemperature(
+            currentTemp,
+            isWholeDegrees ? 'fahrenheit' : 'celsius'
+          )} °${tempUnit || 'C'}`}</tspan>
         </text>
       )}
       {hasHumidity && (
@@ -213,16 +222,18 @@ const CircularGauge = ({
           >
             {intPart}
           </text>
-          <text
-            aria-hidden="true"
-            x={suffixX - 2}
-            y={cy + 25}
-            textAnchor="start"
-            dominantBaseline="auto"
-            class={style.tempDecimal}
-          >
-            .{decPart}
-          </text>
+          {!isWholeDegrees && (
+            <text
+              aria-hidden="true"
+              x={suffixX - 2}
+              y={cy + 25}
+              textAnchor="start"
+              dominantBaseline="auto"
+              class={style.tempDecimal}
+            >
+              .{decPart}
+            </text>
+          )}
           <text
             aria-hidden="true"
             x={suffixX - 3}

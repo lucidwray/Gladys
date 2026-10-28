@@ -27,6 +27,32 @@ export const roundToStep = (value, step) => Number((Math.round(value / step) * s
 // A value shown in the displayed unit keeps one decimal.
 export const roundDisplayValue = value => Math.round(value * 10) / 10;
 
+// A Fahrenheit user sees whole degrees, rounded the conventional way (72.5 is 73); any other unit keeps one decimal.
+export const roundForUnit = (value, unit) =>
+  unit === DEVICE_FEATURE_UNITS.FAHRENHEIT ? Math.round(value) : roundDisplayValue(value);
+
+// The text of a temperature already in the displayed unit: whole degrees Fahrenheit, otherwise one decimal kept.
+export const formatTemperature = (value, unit) =>
+  unit === DEVICE_FEATURE_UNITS.FAHRENHEIT ? String(Math.round(value)) : Number(value).toFixed(1);
+
+// A value held in fromUnit, as it is shown in displayUnit.
+export const toDisplayValue = (value, fromUnit, displayUnit) =>
+  roundForUnit(convertTemperature(value, fromUnit, displayUnit), displayUnit);
+
+// A bound held in the feature's unit, as it is shown in displayUnit. In whole degrees Fahrenheit a bound is rounded
+// inward (the minimum up, the maximum down) so a value picked within it is never outside the device range.
+// The small epsilon keeps a bound that is already whole (21.1111 C = 70 F) from being pushed a degree inward.
+export const toDisplayBound = (bound, fromUnit, displayUnit, isMax) => {
+  if (!Number.isFinite(bound)) {
+    return bound;
+  }
+  const converted = convertTemperature(bound, fromUnit, displayUnit);
+  if (displayUnit !== DEVICE_FEATURE_UNITS.FAHRENHEIT) {
+    return converted;
+  }
+  return isMax ? Math.floor(converted + 1e-9) : Math.ceil(converted - 1e-9);
+};
+
 const clampToBounds = (value, min, max) => {
   let result = value;
   if (Number.isFinite(min)) {
@@ -44,12 +70,15 @@ const getRoundingStep = (featureStep, featureUnit) =>
 
 // setpoint: { featureUnit, displayUnit, featureStep, min, max }, where min and max are in the feature unit.
 // The step of one press, in the displayed unit: the default step of that unit, or the feature's own step
-// when that is coarser (a 2 C step shown in F moves 3.6 F per press, otherwise it would never move).
-export const getDisplayStep = (setpoint, defaultDisplayStep) =>
-  Math.max(
-    defaultDisplayStep,
-    setpoint.featureStep ? convertTemperatureDelta(setpoint.featureStep, setpoint.featureUnit, setpoint.displayUnit) : 0
-  );
+// when that is coarser (a 2 C step shown in F moves 4 F per press, otherwise it would never move). In Fahrenheit
+// the step is a whole number of degrees.
+export const getDisplayStep = (setpoint, defaultDisplayStep) => {
+  const featureStepInDisplayUnit = setpoint.featureStep
+    ? convertTemperatureDelta(setpoint.featureStep, setpoint.featureUnit, setpoint.displayUnit)
+    : 0;
+  const step = Math.max(defaultDisplayStep, featureStepInDisplayUnit);
+  return setpoint.displayUnit === DEVICE_FEATURE_UNITS.FAHRENHEIT ? Math.max(1, Math.round(step)) : step;
+};
 
 // Converts a value typed or stepped in the displayed unit to the feature's unit, on its step, within its bounds.
 export const toFeatureSetpoint = (displayValue, setpoint) =>
@@ -66,7 +95,7 @@ export const toFeatureSetpoint = (displayValue, setpoint) =>
 // The press moves by the display step. If that rounds back to the value already held, the press moves one
 // feature step instead, so a press never leaves the value where it is (unless a bound stops it).
 export const stepSetpoint = (value, direction, setpoint, defaultDisplayStep) => {
-  const displayValue = roundDisplayValue(convertTemperature(value, setpoint.featureUnit, setpoint.displayUnit));
+  const displayValue = toDisplayValue(value, setpoint.featureUnit, setpoint.displayUnit);
   const displayStep = getDisplayStep(setpoint, defaultDisplayStep);
   const stepped = toFeatureSetpoint(Number((displayValue + direction * displayStep).toFixed(6)), setpoint);
   if (stepped !== value) {

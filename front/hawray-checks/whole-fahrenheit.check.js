@@ -88,6 +88,22 @@ for (let f = t.toDisplayBound(16, C, F, false); f <= t.toDisplayBound(30, C, F, 
 // A press at the bound stays on it
 assert.strictEqual(t.stepSetpoint(30, 1, setpointOf(C, 0.5, 16, 30), 1), 30);
 
+// ThermostatBox, F user on a Celsius-native feature (16-30 C, no step): the same arithmetic as toWholeFahrenheitSetpoint.
+// 22.2 C shows 72 F; + sends 23 C (73 F), + again sends 23.5 C (74 F). Converted once, in the front, as the server
+// does not convert a value written on the setpoint feature.
+{
+  const box = { featureUnit: C, displayUnit: F, min: 16, max: 30 };
+  const press = (native, delta) => t.toFeatureSetpoint(t.toDisplayValue(native, C, F) + delta, box);
+  assert.strictEqual(t.toDisplayValue(22.2, C, F), 72);
+  const first = press(22.2, 1);
+  assert.strictEqual(first, 23);
+  assert.strictEqual(t.toDisplayValue(first, C, F), 73);
+  const second = press(first, 1);
+  assert.strictEqual(second, 23.5);
+  assert.strictEqual(t.toDisplayValue(second, C, F), 74);
+  assert.strictEqual(press(second, -1), 23);
+}
+
 // Display step: whole degrees in F, untouched in C
 assert.strictEqual(t.getDisplayStep(setpointOf(C, 0.5), 1), 1);
 assert.strictEqual(t.getDisplayStep(setpointOf(C, 2), 1), 4);

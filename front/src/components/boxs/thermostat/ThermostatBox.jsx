@@ -134,10 +134,14 @@ class ThermostatBox extends Component {
     return DEFAULT_MAX_TEMP;
   };
 
-  // Effective temperature unit: device feature unit takes priority over user preference
+  // The unit the card is shown in. A Fahrenheit user always sees Fahrenheit, even on a Celsius-native feature (the
+  // setpoint is converted on display and on write, see getHeldUnit). For any other user the device feature unit
+  // takes priority over the preference, as it always did.
   getEffectiveUnit = () => {
+    const preference = this.props.user && this.props.user.temperature_unit_preference;
+    if (preference === DEVICE_FEATURE_UNITS.FAHRENHEIT) return DEVICE_FEATURE_UNITS.FAHRENHEIT;
     if (this.state.featureUnit) return this.state.featureUnit;
-    return (this.props.user && this.props.user.temperature_unit_preference) || DEVICE_FEATURE_UNITS.CELSIUS;
+    return preference || DEVICE_FEATURE_UNITS.CELSIUS;
   };
 
   // Values from the device are in the feature's native unit; only when the feature has
@@ -152,11 +156,11 @@ class ThermostatBox extends Component {
     return this.needsFahrenheitConversion() ? celsiusToFahrenheit(temp) : temp;
   };
 
-  // In Fahrenheit the card works in whole degrees. The unit the setpoint is held in is Celsius when the feature
-  // declares none and the user prefers Fahrenheit (it is shown converted), otherwise Fahrenheit itself.
+  // In Fahrenheit the card works in whole degrees. The unit the setpoint is held in is the feature's own unit
+  // (Celsius when it declares none). The server does not convert a value written on the setpoint feature, so the
+  // dial and the + / - buttons convert once, in toWholeFahrenheitSetpoint, and send that native value as it is.
   isWholeFahrenheit = () => this.getTempUnit() === 'F';
-  getHeldUnit = () =>
-    this.needsFahrenheitConversion() ? DEVICE_FEATURE_UNITS.CELSIUS : DEVICE_FEATURE_UNITS.FAHRENHEIT;
+  getHeldUnit = () => this.state.featureUnit || DEVICE_FEATURE_UNITS.CELSIUS;
 
   // A setpoint moved onto the whole degree Fahrenheit grid, within the device's own bounds. Celsius is untouched.
   toWholeFahrenheitSetpoint = (temp, deltaDegrees = 0) => {
@@ -181,10 +185,8 @@ class ThermostatBox extends Component {
     if (!sensorUnit) return temp;
     // Read from the instance field, not from getEffectiveUnit(): the thermostat
     // unit is stored through setState in the same pass and would still be stale.
-    const thermostatUnit =
-      this.thermostatUnit ||
-      (this.props.user && this.props.user.temperature_unit_preference) ||
-      DEVICE_FEATURE_UNITS.CELSIUS;
+    // A feature with no unit is held in Celsius, whatever the user prefers to see.
+    const thermostatUnit = this.thermostatUnit || DEVICE_FEATURE_UNITS.CELSIUS;
     if (sensorUnit === thermostatUnit) return temp;
     if (sensorUnit === DEVICE_FEATURE_UNITS.CELSIUS && thermostatUnit === DEVICE_FEATURE_UNITS.FAHRENHEIT) {
       return celsiusToFahrenheit(temp);

@@ -105,6 +105,8 @@ class GroupControlComponent extends Component {
     }));
   };
 
+  getUserUnit = () => this.props.user && this.props.user.temperature_unit_preference;
+
   // Shows the values on the members right away, the devices confirm them later on
   applyLocally = writes => {
     const changedAt = new Date();
@@ -139,13 +141,13 @@ class GroupControlComponent extends Component {
   };
 
   updateGroupValue = (groupFeature, value) => {
-    const writes = planGroupWrites(this.state.members, groupFeature, value);
+    const writes = planGroupWrites(this.state.members, groupFeature, value, this.getUserUnit());
     this.applyLocally(writes);
     return this.sendWrites(writes);
   };
 
   updateGroupValueWithDebounce = (groupFeature, value) => {
-    const writes = planGroupWrites(this.state.members, groupFeature, value);
+    const writes = planGroupWrites(this.state.members, groupFeature, value, this.getUserUnit());
     this.applyLocally(writes);
     this.getDebouncedSend(`group:${groupFeature.selector}`)(writes);
   };
@@ -217,7 +219,7 @@ class GroupControlComponent extends Component {
     const loading = status === RequestStatus.Getting;
     const groupName = props.box.name || dictionary.hawrayGroupControl.defaultName;
     // The group is one device for the rows: one feature per type, labelled like any other feature
-    const groupFeatures = buildGroupFeatures(members);
+    const groupFeatures = buildGroupFeatures(members, this.getUserUnit());
     const groupDevice = { id: GROUP_DEVICE_ID, selector: GROUP_DEVICE_ID, name: groupName, features: groupFeatures };
     const displayedFeatures = groupFeatures.map(feature => ({
       ...feature,

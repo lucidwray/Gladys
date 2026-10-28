@@ -45,6 +45,7 @@ const CircularGauge = ({
   isActive,
   isWindowOpen,
   tempUnit,
+  wholeDegrees = false,
   a11yLabels = {}
 }) => {
   const cx = 110;
@@ -66,7 +67,7 @@ const CircularGauge = ({
   // 20.96 render as "20.10" (the decimal carried to 10) and -3.5 as "-4.5"
   // (floor rounds away from zero for negatives).
   // A Fahrenheit setpoint is whole degrees: no decimal is drawn, and the group centres on the integer and the unit.
-  const isWholeDegrees = tempUnit === 'F';
+  const isWholeDegrees = wholeDegrees;
   const roundedSetpoint = isWholeDegrees ? Math.round(setpoint) : Math.round(setpoint * 10) / 10;
   const truncated = Math.trunc(roundedSetpoint);
   const decPart = Math.round(Math.abs(roundedSetpoint - truncated) * 10);
@@ -97,7 +98,7 @@ const CircularGauge = ({
     hasCurrentTemp
       ? `${a11yLabels.currentTemp || 'Current temperature'} ${formatTemperature(
           currentTemp,
-          tempUnit === 'F' ? 'fahrenheit' : 'celsius'
+          isWholeDegrees ? 'fahrenheit' : 'celsius'
         )} ${unit}`
       : null,
     hasHumidity ? `${a11yLabels.humidity || 'Humidity'} ${Math.round(humidity)} %` : null,

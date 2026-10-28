@@ -13,6 +13,7 @@ import withIntlAsProp from '../../../utils/withIntlAsProp';
 import ApexChartComponent from './ApexChartComponent';
 import { getDeviceName } from '../../../utils/device';
 import { formatHttpError } from '../../../utils/formatErrors';
+import { convertTemperature, isTemperatureUnit } from '../../../utils/hawrayTemperature';
 
 dayjs.extend(localizedFormat);
 
@@ -104,7 +105,8 @@ const allEqual = arr => arr.every(val => val === arr[0]);
 // from the per-series summaries, ignoring the series hidden by the user in the chart legend.
 // The variation is the one of the averaged value, so the two numbers describe the same thing:
 // "the average of the visible series is now X, that is Y% more/less than at the start of the period".
-const getHeaderValues = (featuresSummary, hiddenSeriesIndexes) => {
+// A last value in Fahrenheit is whole degrees, any other unit keeps up to 2 decimals.
+const getHeaderValues = (featuresSummary, hiddenSeriesIndexes, isFahrenheit) => {
   const visibleSummaries = featuresSummary.filter(
     (summary, index) => summary !== null && !hiddenSeriesIndexes.includes(index)
   );
@@ -115,7 +117,7 @@ const getHeaderValues = (featuresSummary, hiddenSeriesIndexes) => {
   const lastValue = average(visibleSummaries.map(summary => summary.lastValue));
   return {
     variation: calculateVariation(firstValue, lastValue),
-    lastValueRounded: roundWith2DecimalIfNeeded(lastValue)
+    lastValueRounded: isFahrenheit ? Math.round(lastValue) : roundWith2DecimalIfNeeded(lastValue)
   };
 };
 
@@ -392,6 +394,10 @@ class Chartbox extends Component {
         let displayUnit = unit;
 
         // We check if all deviceFeatures selected are in the same unit
+        // The header of a temperature is read in whole degrees Fahrenheit by a Fahrenheit user, the chart series
+        // themselves stay in the unit of the feature
+        const showsFahrenheit =
+          isTemperatureUnit(unit) && this.props.user.temperature_unit_preference === DEVICE_FEATURE_UNITS.FAHRENHEIT;
         const allUnitsAreSame = this.props.box.units ? allEqual(unitsByFeature) : false;
 
         // First and last value of the period for each feature (one entry per series, in the same
@@ -419,13 +425,22 @@ class Chartbox extends Component {
           );
           const { value: lastValue } = checkAndConvertUnit(rawLastValue, unit, userUnitPreference);
           displayUnit = firstElementUnit;
+          if (showsFahrenheit) {
+            return {
+              firstValue: convertTemperature(firstValue, unit, DEVICE_FEATURE_UNITS.FAHRENHEIT),
+              lastValue: convertTemperature(lastValue, unit, DEVICE_FEATURE_UNITS.FAHRENHEIT)
+            };
+          }
           return { firstValue, lastValue };
         });
+        if (showsFahrenheit) {
+          displayUnit = DEVICE_FEATURE_UNITS.FAHRENHEIT;
+        }
 
         newState.featuresSummary = featuresSummary;
         newState.variationDownIsPositive = UNITS_WHEN_DOWN_IS_POSITIVE.includes(displayUnit);
         newState.unit = displayUnit;
-        Object.assign(newState, getHeaderValues(featuresSummary, this.state.hiddenSeriesIndexes));
+        Object.assign(newState, getHeaderValues(featuresSummary, this.state.hiddenSeriesIndexes, showsFahrenheit));
       }
       await this.setState(newState);
     } catch (e) {
@@ -460,7 +475,11 @@ class Chartbox extends Component {
       }
       return {
         hiddenSeriesIndexes,
-        ...getHeaderValues(prevState.featuresSummary, hiddenSeriesIndexes)
+        ...getHeaderValues(
+          prevState.featuresSummary,
+          hiddenSeriesIndexes,
+          prevState.unit === DEVICE_FEATURE_UNITS.FAHRENHEIT
+        )
       };
     });
   };

@@ -4,8 +4,9 @@ import ApexCharts from 'apexcharts';
 import { Text } from 'preact-i18n';
 import withIntlAsProp from '../../../utils/withIntlAsProp';
 
-import { WEBSOCKET_MESSAGE_TYPES } from '../../../../../server/utils/constants';
+import { WEBSOCKET_MESSAGE_TYPES, DEVICE_FEATURE_UNITS } from '../../../../../server/utils/constants';
 import { checkAndConvertUnit } from '../../../../../server/utils/units';
+import { isTemperatureUnit, toDisplayValue } from '../../../utils/hawrayTemperature';
 import { getDeviceName } from '../../../utils/device';
 
 const DEFAULT_GAUGE_COLOR_LOW = '#316cbe';
@@ -142,6 +143,13 @@ class GaugeBox extends Component {
 
   formatValueWithUnit = (value, unit) => {
     const { user } = this.props;
+
+    // A temperature is shown in whole degrees to a Fahrenheit user, converted from the feature's unit
+    if (isTemperatureUnit(unit) && user.temperature_unit_preference === DEVICE_FEATURE_UNITS.FAHRENHEIT) {
+      const { dictionary } = this.props.intl || {};
+      const shortUnit = dictionary ? dictionary.deviceFeatureUnitShort[DEVICE_FEATURE_UNITS.FAHRENHEIT] : null;
+      return `${toDisplayValue(value, unit, DEVICE_FEATURE_UNITS.FAHRENHEIT)} ${shortUnit || '°F'}`;
+    }
 
     // Conversion if necessary (and if user is present)
     const { distance_unit_preference: userUnitPreference } = user;

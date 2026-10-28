@@ -159,7 +159,9 @@ class ThermostatBox extends Component {
   // In Fahrenheit the card works in whole degrees. The unit the setpoint is held in is the feature's own unit
   // (Celsius when it declares none). The server does not convert a value written on the setpoint feature, so the
   // dial and the + / - buttons convert once, in toWholeFahrenheitSetpoint, and send that native value as it is.
-  isWholeFahrenheit = () => this.getTempUnit() === 'F';
+  // Keyed on the user's preference: a Celsius user on a Fahrenheit-native thermostat keeps the half degree card.
+  isWholeFahrenheit = () =>
+    Boolean(this.props.user) && this.props.user.temperature_unit_preference === DEVICE_FEATURE_UNITS.FAHRENHEIT;
   getHeldUnit = () => this.state.featureUnit || DEVICE_FEATURE_UNITS.CELSIUS;
 
   // A setpoint moved onto the whole degree Fahrenheit grid, within the device's own bounds. Celsius is untouched.
@@ -1434,6 +1436,7 @@ class ThermostatBox extends Component {
                     isActive={showActive}
                     isWindowOpen={isWindowOpen}
                     tempUnit={tempUnit}
+                    wholeDegrees={isWholeFahrenheit}
                     a11yLabels={a11yLabels}
                   />
                 </div>

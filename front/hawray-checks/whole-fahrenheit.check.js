@@ -45,6 +45,22 @@ assert.deepStrictEqual(report['celsius step undefined'], []);
 assert.deepStrictEqual(report['celsius step 0.5'], []);
 assert.deepStrictEqual(report['fahrenheit step undefined'], []);
 assert.deepStrictEqual(report['fahrenheit step 1'], []);
+// A feature with a whole degree Celsius step cannot reach every whole F (1 C is 1.8 F): the value picked lands on a
+// whole C within one F of what was asked, and a press never stalls or moves by more than 2 F
+report['celsius step 1'].forEach(failure => {
+  const [asked, sent, shown] = failure.split('->').map(Number);
+  assert.ok(Number.isInteger(sent), `${failure}: not a whole C`);
+  assert.ok(Math.abs(shown - asked) <= 1, `${failure}: more than 1 F away`);
+});
+{
+  let stepValue = t.toFeatureSetpoint(60, setpointOf(C, 1, 5, 35));
+  for (let i = 0; i < 10; i += 1) {
+    const before = t.toDisplayValue(stepValue, C, F);
+    stepValue = t.stepSetpoint(stepValue, 1, setpointOf(C, 1, 5, 35), 1);
+    const moved = t.toDisplayValue(stepValue, C, F) - before;
+    assert.ok(moved >= 1 && moved <= 2, `1 C step press moved ${moved} F`);
+  }
+}
 
 // Stepping: 72 F -> 73 F on a celsius (0.5 step) and on a fahrenheit feature, in both directions
 const c72 = t.toFeatureSetpoint(72, setpointOf(C, 0.5));
@@ -102,6 +118,83 @@ assert.strictEqual(t.stepSetpoint(30, 1, setpointOf(C, 0.5, 16, 30), 1), 30);
   assert.strictEqual(second, 23.5);
   assert.strictEqual(t.toDisplayValue(second, C, F), 74);
   assert.strictEqual(press(second, -1), 23);
+}
+
+// Group control, F user, all members Celsius-native with no step (the case the 0.5 C grid exists for): + moves exactly
+// 1 F per press, every press reaches the next whole F, and the members receive the 0.5 C grid value (74 F = 23.5 C)
+const groupOut = path.join(os.tmpdir(), 'groupControl.check.cjs');
+buildSync({
+  entryPoints: [path.join(__dirname, '../src/components/boxs/hawray-group-control/groupControl.js')],
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  outfile: groupOut,
+  logLevel: 'error'
+});
+// eslint-disable-next-line import/no-dynamic-require
+const g = require(groupOut);
+const member = (selector, value) => ({
+  selector,
+  category: 'thermostat',
+  type: 'target-temperature',
+  unit: C,
+  min: 7,
+  max: 35,
+  last_value: value,
+  device: { id: selector, name: selector }
+});
+const runGroup = (userUnit, presses, direction, start) => {
+  let members = [member('a', start), member('b', start)];
+  const shown = [];
+  const sentToMembers = [];
+  for (let i = 0; i <= presses; i += 1) {
+    const [groupFeature] = g.buildGroupFeatures(members, userUnit);
+    shown.push(t.toDisplayValue(groupFeature.last_value, C, userUnit));
+    if (i === presses) break;
+    const setpoint = {
+      featureUnit: C,
+      displayUnit: userUnit,
+      featureStep: groupFeature.step,
+      min: groupFeature.min,
+      max: groupFeature.max
+    };
+    const sent = t.stepSetpoint(groupFeature.last_value, direction, setpoint, userUnit === F ? 1 : 0.5);
+    const writes = g.planGroupWrites(members, groupFeature, sent, userUnit);
+    sentToMembers.push(writes.map(w => w.value));
+    members = g.applyWritesToMembers(members, writes, new Date().toISOString());
+  }
+  return { shown, sentToMembers };
+};
+{
+  const up = runGroup(F, 4, 1, 22.2);
+  assert.deepStrictEqual(up.shown, [72, 73, 74, 75, 76]);
+  assert.deepStrictEqual(up.sentToMembers[1], [23.5, 23.5]);
+  const down = runGroup(F, 4, -1, 22.2);
+  assert.deepStrictEqual(down.shown, [72, 71, 70, 69, 68]);
+  // Every whole F from 60 to 90 can be set on the group and is read back as the same whole F
+  for (let f = 60; f <= 90; f += 1) {
+    const [groupFeature] = g.buildGroupFeatures([member('a', 22), member('b', 22)], F);
+    const setpoint = {
+      featureUnit: C,
+      displayUnit: F,
+      featureStep: groupFeature.step,
+      min: groupFeature.min,
+      max: groupFeature.max
+    };
+    const sent = t.toFeatureSetpoint(f, setpoint);
+    const members = [member('a', 22), member('b', 22)];
+    const [readBack] = g.buildGroupFeatures(
+      g.applyWritesToMembers(members, g.planGroupWrites(members, groupFeature, sent, F), 'now'),
+      F
+    );
+    assert.strictEqual(t.toDisplayValue(readBack.last_value, C, F), f, `group ${f} F -> ${readBack.last_value} C`);
+  }
+  // A Celsius user is unchanged: the group has no step, a press moves a whole degree Celsius, and members get whole C
+  const [celsiusGroup] = g.buildGroupFeatures([member('a', 22), member('b', 22)], C);
+  assert.strictEqual(celsiusGroup.step, undefined);
+  const celsiusRun = runGroup(C, 2, 1, 22);
+  assert.deepStrictEqual(celsiusRun.shown, [22, 23, 24]);
+  assert.deepStrictEqual(celsiusRun.sentToMembers[0], [23, 23]);
 }
 
 // Display step: whole degrees in F, untouched in C

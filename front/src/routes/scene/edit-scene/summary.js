@@ -2,6 +2,7 @@ import get from 'get-value';
 
 import { ACTIONS, EVENTS } from '../../../../../server/utils/constants';
 import { isWildcardValue } from './sceneIntegrations';
+import { getUserTemperatureDisplay } from '../../../utils/hawrayTemperature';
 
 const truncate = (text, maxLength = 60) => {
   if (typeof text !== 'string') {
@@ -31,6 +32,20 @@ const listDeclaredFields = fields => {
   return parts.length > 0 ? truncate(parts.join(' · ')) : null;
 };
 
+// A numeric threshold or value on a temperature feature, as the user reads it ("72 °F"), when `temperature`
+// ({ user, units }) says the user reads Fahrenheit. Anything else (no temperature context, another unit, a formula)
+// returns null and the caller keeps the plain value.
+const formatTemperatureValue = (value, selector, temperature, dictionary) => {
+  if (!temperature || !temperature.units) {
+    return null;
+  }
+  const display = getUserTemperatureDisplay(value, temperature.units[selector], temperature.user);
+  if (!display) {
+    return null;
+  }
+  return `${display.value} ${get(dictionary, 'deviceFeatureUnitShort.fahrenheit') || '°F'}`;
+};
+
 const listSelectors = selectors => {
   if (!Array.isArray(selectors) || selectors.length === 0) {
     return null;
@@ -41,7 +56,7 @@ const listSelectors = selectors => {
 // Builds a short human-readable summary of a configured action, displayed when
 // its card is collapsed. Returns null when there is nothing meaningful to show:
 // the card then only displays the action type label.
-const getActionSummary = (action, dictionary) => {
+const getActionSummary = (action, dictionary, temperature) => {
   if (!action || !action.type) {
     return null;
   }
@@ -91,9 +106,14 @@ const getActionSummary = (action, dictionary) => {
         action.evaluate_value !== undefined && action.evaluate_value !== null && action.evaluate_value !== ''
           ? action.evaluate_value
           : action.value;
+      const isFormula =
+        action.evaluate_value !== undefined && action.evaluate_value !== null && action.evaluate_value !== '';
+      const temperatureText = isFormula
+        ? null
+        : formatTemperatureValue(value, action.device_feature, temperature, dictionary);
       return joinParts([
         truncate(action.device_feature),
-        value !== undefined && value !== null && value !== '' ? truncate(String(value), 20) : null
+        temperatureText || (value !== undefined && value !== null && value !== '' ? truncate(String(value), 20) : null)
       ]);
     }
     case ACTIONS.LIGHT.TURN_ON:
@@ -176,7 +196,7 @@ const getActionSummary = (action, dictionary) => {
 
 // Builds a short human-readable summary of a configured trigger, displayed when
 // its card is collapsed
-const getTriggerSummary = (trigger, dictionary) => {
+const getTriggerSummary = (trigger, dictionary, temperature) => {
   if (!trigger || !trigger.type) {
     return null;
   }
@@ -191,7 +211,12 @@ const getTriggerSummary = (trigger, dictionary) => {
       return joinParts([
         listSelectors(trigger.device_features) || truncate(trigger.device_feature),
         trigger.operator && trigger.value !== undefined && trigger.value !== null
-          ? `${trigger.operator} ${trigger.value}`
+          ? `${trigger.operator} ${formatTemperatureValue(
+              trigger.value,
+              trigger.device_feature,
+              temperature,
+              dictionary
+            ) || trigger.value}`
           : null
       ]);
     case EVENTS.TIME.CHANGED:

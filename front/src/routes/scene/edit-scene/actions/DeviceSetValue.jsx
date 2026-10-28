@@ -8,6 +8,13 @@ import SelectDeviceFeature from '../../../../components/device/SelectDeviceFeatu
 import SelectDeviceFeatureValue from '../../../../components/device/SelectDeviceFeatureValue';
 import getDeviceFeatureValueOptions, { isValueInOptions } from '../../../../utils/deviceFeatureValueOptions';
 import withIntlAsProp from '../../../../utils/withIntlAsProp';
+import {
+  commitTemperatureText,
+  getEditorSetpoint,
+  getUserTemperatureDisplay,
+  getUserTemperatureRange,
+  showsWholeFahrenheit
+} from '../../../../utils/hawrayTemperature';
 
 import { DEVICE_FEATURE_CATEGORIES, DEVICE_FEATURE_TYPES } from '../../../../../../server/utils/constants';
 import TextWithVariablesInjected from '../../../../components/scene/TextWithVariablesInjected';
@@ -27,7 +34,8 @@ class DeviceSetValue extends Component {
     this.props = props;
     this.state = {
       computed: props.action.evaluate_value !== undefined,
-      customValue: false
+      customValue: false,
+      temperatureText: null
     };
   }
 
@@ -68,8 +76,41 @@ class DeviceSetValue extends Component {
   };
 
   handleNewValue = e => {
+    const { deviceFeature } = this.state;
+    // A Fahrenheit user types whole degrees Fahrenheit; the action keeps the feature's own unit
+    if (deviceFeature && showsWholeFahrenheit(deviceFeature.unit, this.props.user)) {
+      this.commitTemperatureText(e.target.value);
+      return;
+    }
     this.props.updateActionProperty(this.props.path, 'value', e.target.value);
     this.props.updateActionProperty(this.props.path, 'evaluate_value', undefined);
+  };
+
+  // A Fahrenheit user's typing is held as text and read only when the edit ends (blur / Enter) or the slider moves,
+  // so a value on the way ("7" on the way to "74") is never converted or clamped to the device range.
+  handleTemperatureText = e => this.setState({ temperatureText: e.target.value });
+
+  handleTemperatureKeyDown = e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      this.commitTemperatureText(this.state.temperatureText);
+    }
+  };
+
+  handleTemperatureBlur = () => this.commitTemperatureText(this.state.temperatureText);
+
+  commitTemperatureText = text => {
+    const { deviceFeature } = this.state;
+    this.setState({ temperatureText: null });
+    if (text === null || text === undefined) {
+      return;
+    }
+    const setpoint = getEditorSetpoint(deviceFeature.unit, deviceFeature.step, deviceFeature.min, deviceFeature.max);
+    const committed = commitTemperatureText(text, this.props.action.value, setpoint);
+    if (committed) {
+      this.props.updateActionProperty(this.props.path, 'value', committed.value);
+      this.props.updateActionProperty(this.props.path, 'evaluate_value', undefined);
+    }
   };
 
   handleNewPureValue = value => {
@@ -311,6 +352,23 @@ class DeviceSetValue extends Component {
       );
     }
 
+    const wholeFahrenheit = showsWholeFahrenheit(this.state.deviceFeature.unit, this.props.user);
+    const temperatureDisplay = wholeFahrenheit
+      ? getUserTemperatureDisplay(this.props.action.value, this.state.deviceFeature.unit, this.props.user)
+      : null;
+    const sliderRange = wholeFahrenheit
+      ? getUserTemperatureRange(
+          this.state.deviceFeature.min,
+          this.state.deviceFeature.max,
+          this.state.deviceFeature.unit,
+          this.props.user
+        )
+      : null;
+    const { temperatureText } = this.state;
+    const shownValue = temperatureDisplay ? temperatureDisplay.value : this.props.action.value;
+    const typedValue =
+      wholeFahrenheit && temperatureText !== null && temperatureText !== undefined ? temperatureText : shownValue;
+
     return (
       <div>
         <div className={style.explanationText}>
@@ -322,14 +380,16 @@ class DeviceSetValue extends Component {
               type="text"
               placeholder={<Text id="editScene.actionsCard.deviceSetValue.valueLabel" />}
               class="form-control"
-              onChange={this.handleNewValue}
-              value={this.props.action.value}
+              onChange={wholeFahrenheit ? this.handleTemperatureText : this.handleNewValue}
+              onBlur={wholeFahrenheit ? this.handleTemperatureBlur : undefined}
+              onKeyDown={wholeFahrenheit ? this.handleTemperatureKeyDown : undefined}
+              value={typedValue}
             />
           </Localizer>
           {this.state.deviceFeature.unit && (
             <span class="input-group-append" id="basic-addon2">
               <span class="input-group-text">
-                <Text id={`deviceFeatureUnitShort.${this.state.deviceFeature.unit}`} />
+                <Text id={`deviceFeatureUnitShort.${wholeFahrenheit ? 'fahrenheit' : this.state.deviceFeature.unit}`} />
               </span>
             </span>
           )}
@@ -340,14 +400,14 @@ class DeviceSetValue extends Component {
         {!valueOptions && (
           <input
             type="range"
-            value={this.props.action.value}
+            value={shownValue}
             onChange={this.handleNewValue}
             class={cx('form-control custom-range', {
               'light-temperature': this.state.deviceFeature.type === DEVICE_FEATURE_TYPES.LIGHT.TEMPERATURE
             })}
             step="1"
-            min={this.state.deviceFeature.min}
-            max={this.state.deviceFeature.max}
+            min={sliderRange ? sliderRange.min : this.state.deviceFeature.min}
+            max={sliderRange ? sliderRange.max : this.state.deviceFeature.max}
           />
         )}
         {valueOptions && (
@@ -407,4 +467,4 @@ class DeviceSetValue extends Component {
   }
 }
 
-export default withIntlAsProp(connect('httpClient', {})(DeviceSetValue));
+export default withIntlAsProp(connect('httpClient,user', {})(DeviceSetValue));

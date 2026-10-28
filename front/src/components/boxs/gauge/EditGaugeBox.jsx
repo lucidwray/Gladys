@@ -6,6 +6,13 @@ import cx from 'classnames';
 import { connect } from 'unistore/preact';
 import { getDeviceFeatureName } from '../../../utils/device';
 import withIntlAsProp from '../../../utils/withIntlAsProp';
+import {
+  fromEditedTemperature,
+  getEditorSetpoint,
+  getUserTemperatureRange,
+  toDisplayValue,
+  showsWholeFahrenheit
+} from '../../../utils/hawrayTemperature';
 
 import BaseEditBox from '../baseEditBox';
 import { DEFAULT_COLORS, DEFAULT_COLORS_NAME } from '../chart/ApexChartComponent';
@@ -65,6 +72,16 @@ class EditGaugeBoxComponent extends Component {
       gauge_min: values[0],
       gauge_max: values[1]
     });
+  };
+
+  // A Fahrenheit user moves the slider in whole degrees Fahrenheit. Both thumbs come back from the slider, so a
+  // threshold that was not moved keeps the exact value stored; only a moved one is converted to the feature's unit.
+  updateFahrenheitThresholds = (values, current, shown, featureUnit, featureMin, featureMax) => {
+    const setpoint = getEditorSetpoint(featureUnit, undefined, featureMin, featureMax);
+    const [gaugeMin, gaugeMax] = values.map((value, i) =>
+      value === shown[i] ? current[i] : fromEditedTemperature(value, current[i], setpoint)
+    );
+    this.props.updateBoxConfig(this.props.x, this.props.y, { gauge_min: gaugeMin, gauge_max: gaugeMax });
   };
 
   updateColor = key => option => {
@@ -147,7 +164,8 @@ class EditGaugeBoxComponent extends Component {
     const featureMin = featureHasRange ? selectedFeature.min : 0;
     const featureMax = featureHasRange ? selectedFeature.max : 100;
     const range = featureMax - featureMin;
-    const step = range < 50 ? 0.1 : 1;
+    const wholeFahrenheit = Boolean(selectedFeature) && showsWholeFahrenheit(selectedFeature.unit, props.user);
+    const step = wholeFahrenheit ? 1 : range < 50 ? 0.1 : 1;
 
     let gaugeMin = box.gauge_min;
     let gaugeMax = box.gauge_max;
@@ -159,6 +177,31 @@ class EditGaugeBoxComponent extends Component {
     }
     gaugeMin = Math.max(featureMin, Math.min(featureMax, gaugeMin));
     gaugeMax = Math.max(featureMin, Math.min(featureMax, gaugeMax));
+
+    // A Fahrenheit user reads the thresholds and the bounds in whole degrees Fahrenheit (bounds rounded inward)
+    let sliderMin = featureMin;
+    let sliderMax = featureMax;
+    let sliderValue = [gaugeMin, gaugeMax];
+    // (a feature with no range of its own is shown over the same 0-100 default, in the same unit)
+    if (wholeFahrenheit) {
+      const displayRange = getUserTemperatureRange(featureMin, featureMax, selectedFeature.unit, props.user);
+      sliderMin = displayRange.min;
+      sliderMax = displayRange.max;
+      sliderValue = [gaugeMin, gaugeMax].map(value =>
+        Math.max(sliderMin, Math.min(sliderMax, toDisplayValue(value, selectedFeature.unit, 'fahrenheit')))
+      );
+    }
+    const onThresholdsChange = wholeFahrenheit
+      ? values =>
+          this.updateFahrenheitThresholds(
+            values,
+            [gaugeMin, gaugeMax],
+            sliderValue,
+            selectedFeature.unit,
+            featureMin,
+            featureMax
+          )
+      : this.updateThresholds;
 
     const colorLow = box.gauge_color_low || DEFAULT_GAUGE_COLOR_LOW;
     const colorInRange = box.gauge_color_in_range || DEFAULT_GAUGE_COLOR_IN_RANGE;
@@ -175,7 +218,7 @@ class EditGaugeBoxComponent extends Component {
 
     const unitShort =
       selectedFeature && selectedFeature.unit && intl && intl.dictionary && intl.dictionary.deviceFeatureUnitShort
-        ? intl.dictionary.deviceFeatureUnitShort[selectedFeature.unit] || ''
+        ? intl.dictionary.deviceFeatureUnitShort[wholeFahrenheit ? 'fahrenheit' : selectedFeature.unit] || ''
         : '';
 
     const formatThumbValue = value => {
@@ -242,13 +285,13 @@ class EditGaugeBoxComponent extends Component {
                     className={cx('gauge-slider', { 'opacity-60': !useCustomValue })}
                     thumbClassName="gauge-slider-thumb"
                     trackClassName="gauge-slider-track"
-                    value={[gaugeMin, gaugeMax]}
-                    min={featureMin}
-                    max={featureMax}
+                    value={sliderValue}
+                    min={sliderMin}
+                    max={sliderMax}
                     step={step}
                     pearling
                     minDistance={step}
-                    onAfterChange={this.updateThresholds}
+                    onAfterChange={onThresholdsChange}
                     disabled={!useCustomValue}
                     renderTrack={(trackProps, state) => (
                       <div {...trackProps} style={{ ...trackProps.style, backgroundColor: trackColors[state.index] }} />
@@ -323,4 +366,4 @@ class EditGaugeBoxComponent extends Component {
   }
 }
 
-export default connect('httpClient', {})(withIntlAsProp(EditGaugeBoxComponent));
+export default connect('httpClient,user', {})(withIntlAsProp(EditGaugeBoxComponent));

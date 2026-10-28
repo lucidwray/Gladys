@@ -18,6 +18,7 @@ import {
   moveConditionWithKeyboard
 } from './stepDrag';
 import { getActionSummary } from './summary';
+import { useFeatureUnitsForFahrenheitUser } from '../../../utils/hawrayFeatureUnits';
 import withIntlAsProp from '../../../utils/withIntlAsProp';
 
 // Actions cards
@@ -161,7 +162,14 @@ const ActionCard = ({ children, ...props }) => {
     [isCondition, isSequentialStep, path, groupPath, moveCard, moveCardGroup]
   );
 
-  const summary = !isExpanded ? getActionSummary(props.action, props.intl.dictionary) : null;
+  const featureUnits = useFeatureUnitsForFahrenheitUser(
+    props.httpClient,
+    props.user,
+    props.action.type === ACTIONS.DEVICE.SET_VALUE
+  );
+  const summary = !isExpanded
+    ? getActionSummary(props.action, props.intl.dictionary, { user: props.user, units: featureUnits })
+    : null;
   // an action declared by an external integration is titled by its manifest
   // label; an orphan one (uninstalled, key removed) keeps the generic label
   const declarationTitle =
@@ -295,4 +303,4 @@ const ActionCard = ({ children, ...props }) => {
   );
 };
 
-export default connect('user', {})(withIntlAsProp(ActionCard));
+export default connect('user,httpClient', {})(withIntlAsProp(ActionCard));

@@ -18,8 +18,23 @@ docker stop "$GLADYS_NAME" >/dev/null
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$BACKUPS"
+# zwave-js-ui keeps its store under the same directory and writes it while Gladys is stopped:
+# GNU tar exits 1 ("file changed as we read it") for those files, which is a warning, not a failed
+# backup. Its rotating logs are skipped outright. Exit 2+ is a real failure: Gladys is restarted
+# on its current image so a failed backup never leaves the house without Gladys.
+set +e
 docker run --rm --entrypoint tar -v "$GLADYS_DATA:/data:ro" -v "$BACKUPS:/backup" "$IMAGE" \
-  czf "/backup/gladysassistant-$STAMP.tar.gz" -C /data .
+  czf "/backup/gladysassistant-$STAMP.tar.gz" --exclude=./zwave-js-ui/logs -C /data .
+TAR_STATUS=$?
+set -e
+if [ "$TAR_STATUS" -gt 1 ]; then
+  echo "Backup failed (tar exit $TAR_STATUS); restarting $GLADYS_NAME unchanged" >&2
+  docker start "$GLADYS_NAME" >/dev/null
+  exit "$TAR_STATUS"
+fi
+if [ "$TAR_STATUS" -eq 1 ]; then
+  echo "Warning: some files changed while being archived (zwave-js-ui store); the Gladys data was stopped and is consistent"
+fi
 echo "Backup: $BACKUPS/gladysassistant-$STAMP.tar.gz"
 
 # Only one previous container is kept: the one we are replacing now.

@@ -21,7 +21,7 @@ import { getPresetColor as presetColorForMode, readableTextOn } from '../../../u
 import CircularGauge from './CircularGauge';
 import { angleToTemp as angleToSetpoint, getAngleFromPointer, isAngleInArc } from './gaugeGeometry';
 import { loadDeviceConfig } from './deviceConfig';
-import { toDisplayBound, toDisplayValue, toFeatureSetpoint } from '../../../utils/hawrayTemperature';
+import { prefersFahrenheit, toDisplayBound, toDisplayValue, toFeatureSetpoint } from '../../../utils/hawrayTemperature';
 import { isRunningFromStateFeature } from './operatingState';
 
 const PRESET_ICONS = {
@@ -160,8 +160,7 @@ class ThermostatBox extends Component {
   // (Celsius when it declares none). The server does not convert a value written on the setpoint feature, so the
   // dial and the + / - buttons convert once, in toWholeFahrenheitSetpoint, and send that native value as it is.
   // Keyed on the user's preference: a Celsius user on a Fahrenheit-native thermostat keeps the half degree card.
-  isWholeFahrenheit = () =>
-    Boolean(this.props.user) && this.props.user.temperature_unit_preference === DEVICE_FEATURE_UNITS.FAHRENHEIT;
+  isWholeFahrenheit = () => prefersFahrenheit(this.props.user);
   getHeldUnit = () => this.state.featureUnit || DEVICE_FEATURE_UNITS.CELSIUS;
 
   // A setpoint moved onto the whole degree Fahrenheit grid, within the device's own bounds. Celsius is untouched.

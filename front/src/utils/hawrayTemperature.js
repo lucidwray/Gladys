@@ -39,6 +39,19 @@ export const formatTemperature = (value, unit) =>
 export const toDisplayValue = (value, fromUnit, displayUnit) =>
   roundForUnit(convertTemperature(value, fromUnit, displayUnit), displayUnit);
 
+// Chart text for a Fahrenheit user. A reading (a tooltip value) is a temperature: whole degrees. An axis tick is a
+// gridline position the chart library picks: on a narrow range it can sit half a degree apart, and printing those as
+// whole degrees would label two gridlines alike, so a tick keeps one decimal when it is not a whole degree.
+export const formatWholeFahrenheitReading = value =>
+  value === null || value === undefined || Number.isNaN(value) ? value : String(Math.round(value));
+export const formatFahrenheitAxisTick = value => {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return value;
+  }
+  const tenths = Math.round(value * 10) / 10;
+  return Number.isInteger(tenths) ? String(tenths) : tenths.toFixed(1);
+};
+
 // A bound held in the feature's unit, as it is shown in displayUnit. In whole degrees Fahrenheit a bound is rounded
 // inward (the minimum up, the maximum down) so a value picked within it is never outside the device range.
 // The small epsilon keeps a bound that is already whole (21.1111 C = 70 F) from being pushed a degree inward.
@@ -51,6 +64,44 @@ export const toDisplayBound = (bound, fromUnit, displayUnit, isMax) => {
     return converted;
   }
   return isMax ? Math.floor(converted + 1e-9) : Math.ceil(converted - 1e-9);
+};
+
+// The one rule of the fork for what a user reads: a user whose preference is Fahrenheit reads every temperature in
+// whole degrees Fahrenheit, whatever unit the feature holds it in. Any other user (Celsius, or a preference not loaded
+// yet) keeps the display upstream Gladys gives, so the helpers below return null for them and the caller keeps its
+// own code path untouched.
+export const prefersFahrenheit = user =>
+  Boolean(user) && user.temperature_unit_preference === DEVICE_FEATURE_UNITS.FAHRENHEIT;
+
+// True when a value held in `unit` is shown to `user` in whole degrees Fahrenheit.
+export const showsWholeFahrenheit = (unit, user) => isTemperatureUnit(unit) && prefersFahrenheit(user);
+
+// { value, unit } of a temperature held in `unit`, as `user` reads it, or null when the caller's display applies.
+export const getUserTemperatureDisplay = (value, unit, user) => {
+  if (!showsWholeFahrenheit(unit, user) || value === null || value === undefined || value === '') {
+    return null;
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return null;
+  }
+  return {
+    value: toDisplayValue(number, unit, DEVICE_FEATURE_UNITS.FAHRENHEIT),
+    unit: DEVICE_FEATURE_UNITS.FAHRENHEIT
+  };
+};
+
+// { min, max, unit } of a range held in `unit`, as `user` reads it (whole degrees, rounded inward so the range shown
+// never goes past the device's own), or null when the caller's display applies.
+export const getUserTemperatureRange = (min, max, unit, user) => {
+  if (!showsWholeFahrenheit(unit, user)) {
+    return null;
+  }
+  return {
+    min: toDisplayBound(min, unit, DEVICE_FEATURE_UNITS.FAHRENHEIT, false),
+    max: toDisplayBound(max, unit, DEVICE_FEATURE_UNITS.FAHRENHEIT, true),
+    unit: DEVICE_FEATURE_UNITS.FAHRENHEIT
+  };
 };
 
 const clampToBounds = (value, min, max) => {

@@ -5,11 +5,10 @@ import get from 'get-value';
 import {
   DEVICE_FEATURE_CATEGORIES,
   DEVICE_FEATURE_TYPES,
-  DEVICE_FEATURE_UNITS,
   OPENING_SENSOR_STATE
 } from '../../../../server/utils/constants';
 import withIntlAsProp from '../../utils/withIntlAsProp';
-import { isTemperatureUnit, toDisplayValue } from '../../utils/hawrayTemperature';
+import { getUserTemperatureDisplay } from '../../utils/hawrayTemperature';
 
 const roundValue = value => Math.round(value * 10) / 10;
 
@@ -17,8 +16,6 @@ const roundValue = value => Math.round(value * 10) / 10;
 // that display a state inline (chips bar, scene status subtitle, house-view
 // pins). Enum values (vacuum state, shutter state, thermostat mode…) resolve
 // through the app's existing per-category value labels.
-const TEMPERATURE_CATEGORIES = [DEVICE_FEATURE_CATEGORIES.TEMPERATURE_SENSOR, DEVICE_FEATURE_CATEGORIES.THERMOSTAT];
-
 const DeviceFeatureValueText = ({ feature, intl, user }) => {
   if (!feature || feature.last_value === null || feature.last_value === undefined) {
     return <Text id="deviceFeatureValueText.noValue" />;
@@ -38,16 +35,11 @@ const DeviceFeatureValueText = ({ feature, intl, user }) => {
     return feature.last_value ? <Text id="deviceFeatureValueText.on" /> : <Text id="deviceFeatureValueText.off" />;
   }
   // A Fahrenheit user reads a temperature in whole degrees Fahrenheit, converted from the feature's own unit
-  if (
-    TEMPERATURE_CATEGORIES.includes(feature.category) &&
-    isTemperatureUnit(feature.unit) &&
-    user &&
-    user.temperature_unit_preference === DEVICE_FEATURE_UNITS.FAHRENHEIT
-  ) {
+  const temperature = getUserTemperatureDisplay(feature.last_value, feature.unit, user);
+  if (temperature) {
     return (
       <span>
-        {toDisplayValue(feature.last_value, feature.unit, DEVICE_FEATURE_UNITS.FAHRENHEIT)}{' '}
-        <Text id={`deviceFeatureUnitShort.${DEVICE_FEATURE_UNITS.FAHRENHEIT}`} />
+        {temperature.value} <Text id={`deviceFeatureUnitShort.${temperature.unit}`} />
       </span>
     );
   }

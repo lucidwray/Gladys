@@ -212,4 +212,42 @@ for (let i = 0; i < 6; i += 1) {
   seen.push(`${v}F/${t.roundDisplayValue(t.convertTemperature(v, F, C))}C`);
 }
 console.log('F feature, C user, 6 presses from 72 F:', seen.join(' '));
+
+// Round 3: the one rule every display site reads (gauge, chart, activity, chips, controls table, raw value)
+const fUser = { temperature_unit_preference: F };
+const cUser = { temperature_unit_preference: C };
+const loadingUser = { language: 'en' }; // the store user before /api/v1/me answers
+assert.strictEqual(t.prefersFahrenheit(fUser), true);
+assert.strictEqual(t.prefersFahrenheit(cUser), false);
+assert.strictEqual(t.prefersFahrenheit(loadingUser), false);
+assert.strictEqual(t.prefersFahrenheit(undefined), false);
+assert.deepStrictEqual(t.getUserTemperatureDisplay(23, C, fUser), { value: 73, unit: F });
+assert.deepStrictEqual(t.getUserTemperatureDisplay(22.2, C, fUser), { value: 72, unit: F });
+assert.deepStrictEqual(t.getUserTemperatureDisplay(70.5, F, fUser), { value: 71, unit: F });
+assert.deepStrictEqual(t.getUserTemperatureDisplay('21.4', C, fUser), { value: 71, unit: F });
+// a Celsius user, a user not loaded yet, a non-temperature unit or no value: the caller keeps its own display
+[
+  [22.2, C, cUser],
+  [70.5, F, cUser],
+  [22.2, C, loadingUser],
+  [22.2, C, undefined],
+  [45, 'percent', fUser],
+  [45, undefined, fUser],
+  [null, C, fUser],
+  [undefined, C, fUser],
+  ['', C, fUser],
+  ['abc', C, fUser]
+].forEach(([value, unit, user]) => assert.strictEqual(t.getUserTemperatureDisplay(value, unit, user), null));
+// ranges: inward, whole degrees (7..30 C is 44.6..86 F, shown 45..86)
+assert.deepStrictEqual(t.getUserTemperatureRange(7, 30, C, fUser), { min: 45, max: 86, unit: F });
+assert.deepStrictEqual(t.getUserTemperatureRange(44.6, 86.4, F, fUser), { min: 45, max: 86, unit: F });
+assert.strictEqual(t.getUserTemperatureRange(7, 30, C, cUser), null);
+assert.strictEqual(t.getUserTemperatureRange(0, 100, 'percent', fUser), null);
+// chart text: a reading is whole, a tick keeps the gridline precision
+assert.strictEqual(t.formatWholeFahrenheitReading(71.96), '72');
+assert.strictEqual(t.formatWholeFahrenheitReading(undefined), undefined);
+assert.strictEqual(t.formatFahrenheitAxisTick(72), '72');
+assert.strictEqual(t.formatFahrenheitAxisTick(71.5), '71.5');
+assert.strictEqual(t.formatFahrenheitAxisTick(71.999999), '72');
+assert.strictEqual(t.formatFahrenheitAxisTick(null), null);
 console.log('OK');

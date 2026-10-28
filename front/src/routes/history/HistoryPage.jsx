@@ -253,6 +253,7 @@ const HistoryPage = ({ intl, user, ...props }) => {
                             expanded={props.expandedGroups[eventGroup.key]}
                             toggleExpand={() => props.toggleExpand(eventGroup.key)}
                             featuresBySelector={props.featuresBySelector}
+                            user={user}
                           />
                         ))}
                       </div>

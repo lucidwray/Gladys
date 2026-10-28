@@ -4,9 +4,9 @@ import ApexCharts from 'apexcharts';
 import { Text } from 'preact-i18n';
 import withIntlAsProp from '../../../utils/withIntlAsProp';
 
-import { WEBSOCKET_MESSAGE_TYPES, DEVICE_FEATURE_UNITS } from '../../../../../server/utils/constants';
+import { WEBSOCKET_MESSAGE_TYPES } from '../../../../../server/utils/constants';
 import { checkAndConvertUnit } from '../../../../../server/utils/units';
-import { isTemperatureUnit, toDisplayValue } from '../../../utils/hawrayTemperature';
+import { getUserTemperatureDisplay, prefersFahrenheit } from '../../../utils/hawrayTemperature';
 import { getDeviceName } from '../../../utils/device';
 
 const DEFAULT_GAUGE_COLOR_LOW = '#316cbe';
@@ -145,10 +145,11 @@ class GaugeBox extends Component {
     const { user } = this.props;
 
     // A temperature is shown in whole degrees to a Fahrenheit user, converted from the feature's unit
-    if (isTemperatureUnit(unit) && user.temperature_unit_preference === DEVICE_FEATURE_UNITS.FAHRENHEIT) {
+    const temperature = getUserTemperatureDisplay(value, unit, user);
+    if (temperature) {
       const { dictionary } = this.props.intl || {};
-      const shortUnit = dictionary ? dictionary.deviceFeatureUnitShort[DEVICE_FEATURE_UNITS.FAHRENHEIT] : null;
-      return `${toDisplayValue(value, unit, DEVICE_FEATURE_UNITS.FAHRENHEIT)} ${shortUnit || '°F'}`;
+      const shortUnit = dictionary ? dictionary.deviceFeatureUnitShort[temperature.unit] : null;
+      return `${temperature.value} ${shortUnit || '°F'}`;
     }
 
     // Conversion if necessary (and if user is present)
@@ -236,7 +237,11 @@ class GaugeBox extends Component {
         prevProps.box.gauge_color_in_range !== this.props.box.gauge_color_in_range ||
         prevProps.box.gauge_color_high !== this.props.box.gauge_color_high);
     const displayLabelChanged = prevProps.box.name !== this.props.box.name;
-    if (deviceFeatureIdentityChanged || displayLabelChanged) {
+    // The value label is baked into the chart. The user preference arrives from /api/v1/me after the first render,
+    // in parallel with the device: when it turns to (or from) Fahrenheit, the label is drawn again.
+    const wholeFahrenheitChanged =
+      Boolean(this.chart) && prefersFahrenheit(prevProps.user) !== prefersFahrenheit(this.props.user);
+    if (deviceFeatureIdentityChanged || displayLabelChanged || wholeFahrenheitChanged) {
       this.initChart();
     } else if (valueChanged || gaugeStyleChanged) {
       // Only initialize the chart if it doesn't exist yet

@@ -1,7 +1,7 @@
 import { Text } from 'preact-i18n';
 
 import RelativeTime from '../../components/device/RelativeTime';
-import { formatAbsoluteDate, formatFeatureValue, isChartableFeature } from './helpers';
+import { formatAbsoluteDate, formatFeatureValue, getFeatureUnitAndRange, isChartableFeature } from './helpers';
 
 const hasNumber = value => typeof value === 'number' && Number.isFinite(value);
 
@@ -58,6 +58,8 @@ const DeviceFeaturesTable = ({ features, user, intl }) => {
                 {features.map(feature => {
                   const value = formatFeatureValue(feature, options);
                   const hasRange = isChartableFeature(feature) && hasNumber(feature.min) && hasNumber(feature.max);
+                  // A Fahrenheit user reads a temperature feature in whole degrees Fahrenheit, its range inward
+                  const { unit, min, max } = getFeatureUnitAndRange(feature, user);
                   return (
                     <tr key={feature.selector}>
                       <td>{feature.name}</td>
@@ -71,10 +73,8 @@ const DeviceFeaturesTable = ({ features, user, intl }) => {
                           </Text>
                         </div>
                       </td>
-                      <td>
-                        {feature.unit ? <Text id={`deviceFeatureUnitShort.${feature.unit}`}>{feature.unit}</Text> : '—'}
-                      </td>
-                      <td>{hasRange ? `${feature.min} – ${feature.max}` : '—'}</td>
+                      <td>{unit ? <Text id={`deviceFeatureUnitShort.${unit}`}>{unit}</Text> : '—'}</td>
+                      <td>{hasRange ? `${min} – ${max}` : '—'}</td>
                       <td>
                         {feature.read_only ? (
                           <Text id="hawrayControls.detail.features.readOnly" />

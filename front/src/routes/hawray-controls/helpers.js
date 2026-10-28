@@ -1,13 +1,9 @@
 import dayjs from 'dayjs';
 import get from 'get-value';
 
-import {
-  DEVICE_FEATURE_CATEGORIES,
-  DEVICE_FEATURE_TYPES,
-  DEVICE_FEATURE_UNITS
-} from '../../../../server/utils/constants';
+import { DEVICE_FEATURE_CATEGORIES, DEVICE_FEATURE_TYPES } from '../../../../server/utils/constants';
 import { checkAndConvertUnit } from '../../../../server/utils/units';
-import { isTemperatureUnit, toDisplayValue } from '../../utils/hawrayTemperature';
+import { getUserTemperatureDisplay, getUserTemperatureRange } from '../../utils/hawrayTemperature';
 
 export const BINARY_TYPE = DEVICE_FEATURE_TYPES.LIGHT.BINARY;
 const BRIGHTNESS_TYPE = DEVICE_FEATURE_TYPES.LIGHT.BRIGHTNESS;
@@ -104,6 +100,22 @@ const roundValue = value => (Number.isInteger(value) ? value : Math.round(value 
  * @returns {string|null} The displayed value, or null when the feature has no value yet.
  * @example formatFeatureValue({ type: 'binary', last_value: 1 }, { dictionary }); // 'On'
  */
+/**
+ * @description The unit and the min-max range of a feature as the user reads them: a Fahrenheit user reads a
+ * temperature feature in whole degrees Fahrenheit, its range rounded inward. Any other feature, or user, as it is held.
+ * @param {object} feature - The device feature, with its unit, min and max.
+ * @param {object} user - The connected user, with its temperature preference.
+ * @returns {object} { unit, min, max }.
+ * @example getFeatureUnitAndRange({ unit: 'celsius', min: 7, max: 30 }, { temperature_unit_preference: 'fahrenheit' });
+ * // { unit: 'fahrenheit', min: 45, max: 86 }
+ */
+export const getFeatureUnitAndRange = (feature, user) =>
+  getUserTemperatureRange(feature.min, feature.max, feature.unit, user) || {
+    unit: feature.unit,
+    min: feature.min,
+    max: feature.max
+  };
+
 export const formatFeatureValue = (feature, { user, dictionary }) => {
   if (isTextSelectFeature(feature)) {
     return feature.last_value_string || null;
@@ -115,10 +127,10 @@ export const formatFeatureValue = (feature, { user, dictionary }) => {
     return get(dictionary, feature.last_value === 1 ? 'deviceFeatureValueText.on' : 'deviceFeatureValueText.off');
   }
   // A temperature is shown in whole degrees when the user prefers Fahrenheit
-  if (isTemperatureUnit(feature.unit) && user && user.temperature_unit_preference === DEVICE_FEATURE_UNITS.FAHRENHEIT) {
-    const shortFahrenheit = get(dictionary, `deviceFeatureUnitShort.${DEVICE_FEATURE_UNITS.FAHRENHEIT}`);
-    const wholeValue = toDisplayValue(feature.last_value, feature.unit, DEVICE_FEATURE_UNITS.FAHRENHEIT);
-    return shortFahrenheit ? `${wholeValue} ${shortFahrenheit}` : `${wholeValue}`;
+  const temperature = getUserTemperatureDisplay(feature.last_value, feature.unit, user);
+  if (temperature) {
+    const shortFahrenheit = get(dictionary, `deviceFeatureUnitShort.${temperature.unit}`);
+    return shortFahrenheit ? `${temperature.value} ${shortFahrenheit}` : `${temperature.value}`;
   }
   const { value, unit } = checkAndConvertUnit(feature.last_value, feature.unit, user && user.distance_unit_preference);
   const shortUnit = unit ? get(dictionary, `deviceFeatureUnitShort.${unit}`) : null;

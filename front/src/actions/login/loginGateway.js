@@ -1,6 +1,6 @@
 import get from 'get-value';
 import { RequestStatus, LoginStatus } from '../../utils/consts';
-import { validateEmail } from '../../utils/validator';
+import { validateEmail, cleanEmail } from '../../utils/validator';
 import { ERROR_MESSAGES } from '../../../../server/utils/constants';
 import createActionsProfilePicture from '../profilePicture';
 import { route } from 'preact-router';
@@ -48,7 +48,8 @@ function createActions(store) {
       if (e) {
         e.preventDefault();
       }
-      if (!validateEmail(state.gatewayLoginEmail)) {
+      const email = cleanEmail(state.gatewayLoginEmail);
+      if (!validateEmail(email)) {
         return store.setState({
           gatewayLoginStatus: LoginStatus.WrongEmailError
         });
@@ -58,10 +59,7 @@ function createActions(store) {
         gatewayLoginError: null
       });
       try {
-        const gatewayLoginResults = await state.session.gatewayClient.login(
-          state.gatewayLoginEmail,
-          state.gatewayLoginPassword
-        );
+        const gatewayLoginResults = await state.session.gatewayClient.login(email, state.gatewayLoginPassword);
         if (gatewayLoginResults.two_factor_token) {
           store.setState({
             gatewayLoginResults,
@@ -98,7 +96,7 @@ function createActions(store) {
       // silently with the credentials still in memory, so they only have to
       // enter a fresh code from their app to finalize the connection.
       const gatewayLoginResults = await state.session.gatewayClient.login(
-        state.gatewayLoginEmail,
+        cleanEmail(state.gatewayLoginEmail),
         state.gatewayLoginPassword
       );
       store.setState({
@@ -125,6 +123,17 @@ function createActions(store) {
         });
         // save user
         state.session.saveUser(user);
+        // the app is not remounted after login, so checkSession will not run:
+        // the Gladys Plus role (which settings tabs show Billing) is read here.
+        // A failure only hides Billing until the next reload, not the login.
+        try {
+          const gatewayUser = await state.session.getGatewayUser();
+          store.setState({
+            gatewayUserRole: gatewayUser.role
+          });
+        } catch (e) {
+          console.error(e);
+        }
         // get profile picture
         await actionsProfilePicture.loadProfilePicture(store.getState());
         // verify if we need to redirect to the previous page

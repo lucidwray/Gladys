@@ -290,7 +290,10 @@ const AppRouter = connect(
         <SafeAsyncRoute path="/dashboard/:dashboardSelector" component={Dashboard} />
         <EditDashboard path="/dashboard/:dashboardSelector/edit" />
         <NewDashboard path="/dashboard/create/new" />
-        <SafeAsyncRoute path="/dashboard/integration" component={IntegrationPage} />
+        {/* a plain element like the other catalog views, not an AsyncRoute:
+            preact-router then reuses the same page from one view to the next,
+            so a running "Update all" survives a visit to "All integrations" */}
+        <IntegrationPage path="/dashboard/integration" />
 
         <IntegrationPage path="/dashboard/integration/favorites" category="favorites" />
         <IntegrationPage path="/dashboard/integration/updates" category="updates" />
@@ -308,6 +311,7 @@ const AppRouter = connect(
         <Redirect path="/dashboard/integration/communication" to="/dashboard/integration" />
         <Redirect path="/dashboard/integration/calendar" to="/dashboard/integration/services" />
         <Redirect path="/dashboard/integration/weather" to="/dashboard/integration/environment" />
+        <Redirect path="/dashboard/integration/tts" to="/dashboard/integration/assistants" />
         <Redirect path="/dashboard/integration/music" to="/dashboard/integration" />
         <Redirect path="/dashboard/integration/health" to="/dashboard/integration" />
         <Redirect path="/dashboard/integration/navigation" to="/dashboard/integration" />

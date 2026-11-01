@@ -1,6 +1,7 @@
 const AreaController = require('./controllers/area.controller');
 const CalendarController = require('./controllers/calendar.controller');
 const CameraController = require('./controllers/camera.controller');
+const MusicController = require('./controllers/music.controller');
 const DashboardController = require('./controllers/dashboard.controller');
 const DeviceController = require('./controllers/device.controller');
 const UserController = require('./controllers/user.controller');
@@ -19,6 +20,7 @@ const ExternalIntegrationController = require('./controllers/externalIntegration
 const IntegrationHostController = require('./controllers/integrationHost.controller');
 const SceneController = require('./controllers/scene.controller');
 const SystemController = require('./controllers/system.controller');
+const TtsController = require('./controllers/tts.controller');
 const VariableController = require('./controllers/variable.controller');
 const WeatherController = require('./controllers/weather.controller');
 const EnergyPriceController = require('./controllers/energy-price.controller');
@@ -36,6 +38,7 @@ function getRoutes(gladys) {
   const areaController = AreaController(gladys);
   const calendarController = CalendarController(gladys);
   const cameraController = CameraController(gladys);
+  const musicController = MusicController(gladys);
   const dashboardController = DashboardController(gladys);
   const deviceController = DeviceController(gladys);
   const lightController = LightController(gladys);
@@ -48,6 +51,7 @@ function getRoutes(gladys) {
   const pingController = PingController();
   const gatewayController = GatewayController(gladys);
   const roomController = RoomController(gladys);
+  const ttsController = TtsController(gladys);
   const variableController = VariableController(gladys);
   const sessionController = SessionController(gladys);
   const serviceController = ServiceController(gladys);
@@ -179,6 +183,35 @@ function getRoutes(gladys) {
     'post /api/v1/camera/:camera_selector/image': {
       authenticated: true,
       controller: cameraController.setImage,
+    },
+    // music players (capabilities/music.md): on-demand catalog, queue and artwork
+    'get /api/v1/device/:device_selector/music/capabilities': {
+      authenticated: true,
+      controller: musicController.getCapabilities,
+    },
+    'get /api/v1/device/:device_selector/music/browse': {
+      authenticated: true,
+      controller: musicController.browse,
+    },
+    'get /api/v1/device/:device_selector/music/search': {
+      authenticated: true,
+      controller: musicController.search,
+    },
+    'post /api/v1/device/:device_selector/music/play': {
+      authenticated: true,
+      controller: musicController.play,
+    },
+    'get /api/v1/device/:device_selector/music/queue': {
+      authenticated: true,
+      controller: musicController.getQueue,
+    },
+    'post /api/v1/device/:device_selector/music/queue/play': {
+      authenticated: true,
+      controller: musicController.playQueueItem,
+    },
+    'get /api/v1/device/:device_selector/music/artwork/:key': {
+      authenticated: true,
+      controller: musicController.getArtwork,
     },
     // dashboard
     'get /api/v1/dashboard': {
@@ -458,8 +491,13 @@ function getRoutes(gladys) {
       admin: true,
       controller: gatewayController.getInstanceKeysFingerprint,
     },
+    // raw completion proxy, the debug-context replay path: with an external
+    // AI provider it reaches a personal API key or a host model with no
+    // bound on the outbound payload, so it is an admin tool like the
+    // debug context itself. Household chat goes through message.create
     'post /api/v1/gateway/aichat/chat': {
       authenticated: true,
+      admin: true,
       controller: gatewayController.aiChat,
     },
     'get /api/v1/gateway/aichat/debug-context': {
@@ -489,6 +527,25 @@ function getRoutes(gladys) {
     'post /api/v1/gateway/tts': {
       authenticated: true,
       controller: gatewayController.getTtsUrl,
+    },
+    // tts (docs/specs/external-integrations/capabilities/tts-type.md)
+    'get /api/v1/tts/provider': {
+      // non-admin read: the scene editor uses it to stop showing the
+      // Gladys Plus upsell when another provider is active
+      authenticated: true,
+      controller: ttsController.getProviderConfiguration,
+    },
+    'post /api/v1/tts/provider': {
+      authenticated: true,
+      admin: true,
+      controller: ttsController.setActiveProvider,
+    },
+    'get /api/v1/tts/audio/:token': {
+      // unauthenticated by design: fetched by LAN speakers (Sonos
+      // trackUri...) that cannot send a JWT — the high-entropy token
+      // minted by gladys.tts.getSpeechUrl is the secret
+      authenticated: false,
+      controller: ttsController.getAudio,
     },
     'post /api/v1/gateway/refresh-latest-gladys-version': {
       authenticated: true,
@@ -575,6 +632,19 @@ function getRoutes(gladys) {
       authenticated: true,
       controller: externalIntegrationController.getAll,
     },
+    // AI provider selection (external integrations of type "ai" can serve
+    // the assistant instead of Gladys Plus): read is authenticated (the
+    // chat hides its model selector when an external provider is active),
+    // write is an admin gesture
+    'get /api/v1/ai_provider': {
+      authenticated: true,
+      controller: externalIntegrationController.getAiProvider,
+    },
+    'post /api/v1/ai_provider': {
+      authenticated: true,
+      admin: true,
+      controller: externalIntegrationController.setAiProvider,
+    },
     'get /api/v1/external_integration/store': {
       authenticated: true,
       admin: true,
@@ -589,6 +659,11 @@ function getRoutes(gladys) {
       authenticated: true,
       admin: true,
       controller: externalIntegrationController.getStoreDocs,
+    },
+    'get /api/v1/external_integration/store/integration': {
+      authenticated: true,
+      admin: true,
+      controller: externalIntegrationController.getStoreIntegration,
     },
     'post /api/v1/external_integration/store/refresh': {
       authenticated: true,

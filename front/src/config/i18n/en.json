@@ -40,6 +40,14 @@
     "problemScene": "Choose a scene for every scene switch.",
     "problemOffScene": "Choose an off scene for every on/off pair."
   },
+  "musicMediaTypes": {
+    "track": "Track",
+    "album": "Album",
+    "artist": "Artist",
+    "playlist": "Playlist",
+    "radio": "Radio",
+    "folder": "Folder"
+  },
   "global": {
     "logoAlt": "Gladys logo",
     "needHelpText": "Need help? Join us on <a href=\"https://community.gladysassistant.com/\" target=\"_blank\" rel=\"noopener noreferrer\"> Gladys Community</a>.",
@@ -124,6 +132,7 @@
       "unitMismatchWarning": "This feature has a different unit than the source feature: values are moved without conversion, so charts may become inconsistent.",
       "unmappedWarning": "Some features are not matched: their history will be deleted, and the scenes and dashboards using them will not be updated.",
       "playNotificationWarning": "The destination device cannot play notifications: the scenes that \"talk on\" this speaker will be re-pointed to the destination, and will fail when they run. Pick a destination that supports notifications, or edit those scenes after the migration.",
+      "playMediaWarning": "The scenes that play music (a playlist, an album, a track) on this player keep media references that belong to its integration: they will be re-pointed to the destination and will only work if the destination uses the same music provider. Check those scenes after the migration.",
       "noDestinationAvailable": "No device from another integration was found. Create the destination device in its new integration first, then come back here to migrate.",
       "loadError": "Unable to load the list of devices. Please try again.",
       "migrateError": "The migration failed. The old device was not deleted, but some history may already have been moved to the destination. Check the jobs page and your device list, then try again: re-running only moves what remains to migrate.",
@@ -794,7 +803,38 @@
         "cancelAlarmArming": "Cancel"
       },
       "music": {
-        "selectDeviceLabel": "Select device to control"
+        "selectDeviceLabel": "Select device to control",
+        "nothingPlaying": "Nothing playing",
+        "unknownTrack": "Unknown track",
+        "previous": "Previous",
+        "next": "Next",
+        "play": "Play",
+        "pause": "Pause",
+        "shuffle": "Shuffle",
+        "repeat": "Repeat",
+        "mute": "Mute",
+        "volume": "Volume",
+        "queue": "Queue",
+        "browse": "Browse",
+        "search": "Search",
+        "searchPlaceholder": "Songs, artists, playlists…",
+        "back": "Back",
+        "close": "Close",
+        "playItem": "Play",
+        "playNext": "Play next",
+        "addToQueue": "Add to queue",
+        "added": "Added to queue",
+        "playAll": "Play",
+        "pickThis": "Choose",
+        "live": "Live",
+        "commandFailed": "The player could not run this command.",
+        "noResponse": "The player did not respond.",
+        "emptyQueue": "The queue is empty",
+        "noResults": "No results",
+        "loading": "Loading…",
+        "loadMore": "Load more",
+        "unavailable": "The integration is unavailable. The last known state is shown.",
+        "error": "Something went wrong."
       },
       "voice-assistant": {
         "speak": "Speak",
@@ -1016,20 +1056,51 @@
       "external": "Community",
       "native": "Native",
       "deprecated": "Soon deprecated",
-      "new": "New"
+      "new": "New",
+      "installed": "Installed"
     },
     "root": {
       "title": "Integrations",
       "subtitle": "{{length}} of {{total}} integrations",
       "subtitleTotal": "{{total}} integrations",
+      "loadingCatalog": "Loading the catalog…",
       "searchPlaceholder": "Search an integration",
       "noIntegrations": "No integration found",
+      "showMore": {
+        "one": "Show 1 more integration",
+        "other": "Show more integrations ({{count}} remaining)"
+      },
+      "storeUnavailable": "The community integration store could not be reached: only the native integrations and the ones already installed are shown.",
+      "storeUnavailableRetry": "Retry",
       "allIntegrationsUpToDate": "All your integrations are up to date.",
+      "updateButton": "Update",
+      "updateRetryButton": "Retry",
+      "updateError": "The update failed. Check the integration logs, then retry.",
+      "updatedTo": "Updated to v{{version}}",
       "noInstalledIntegrations": "No community integration is installed on this instance yet.",
       "installedSummary": {
         "title": {
           "one": "1 community integration installed on this instance.",
           "other": "{{count}} community integrations installed on this instance."
+        }
+      },
+      "updateAll": {
+        "title": {
+          "one": "1 update available",
+          "other": "{{count}} updates available"
+        },
+        "description": "Integrations are updated one after the other: each container restarts on its new version.",
+        "button": "Update all",
+        "progress": "Updating {{name}} ({{current}} of {{total}})…",
+        "keepPageOpen": "Keep the Integrations catalog open until the end: you can switch views, but leaving the catalog stops the remaining updates.",
+        "waitCardUpdate": "An integration is being updated from its card: \"Update all\" is available once it ends.",
+        "success": {
+          "one": "The integration has been updated.",
+          "other": "The {{total}} integrations have been updated."
+        },
+        "failed": {
+          "one": "1 of {{total}} updates failed. Open the integration to check its logs and retry:",
+          "other": "{{failed}} of {{total}} updates failed. Open each integration to check its logs and retry:"
         }
       },
       "noSearchResults": "No integration matching \"{{searchKeyword}}\" was found.",
@@ -1048,6 +1119,17 @@
         "description": "Many devices can be connected via <a href=\"/dashboard/integration/device/matter\">Matter</a> (universal protocol). Your device can also be supported by a community <b>external integration</b>: anyone can create one and publish it in the store, it then appears in this list. See the <a href=\"https://gladysassistant.com/docs/dev/external-integrations/\" target=\"_blank\" rel=\"noopener noreferrer\">external integrations documentation</a>."
       },
       "orderDirNewest": "Newest first",
+      "orderDirUpdated": "Last updated",
+      "clearFilters": "Clear filters",
+      "countryFilter": {
+        "scoped": {
+          "one": "Country: {{country}}. 1 integration from another country is hidden.",
+          "other": "Country: {{country}}. {{count}} integrations from other countries are hidden."
+        },
+        "showAll": "Show all countries",
+        "all": "All countries are shown.",
+        "showOnly": "Limit to {{country}}"
+      },
       "menu": {
         "all": "All integrations",
         "favorites": "Favorites",
@@ -1064,11 +1146,14 @@
         "network": "Network & presence",
         "notifications": "Messaging & notifications",
         "assistants": "Voice assistants & AI",
-        "services": "Services"
+        "services": "Services",
+        "transport": "Transport & mobility",
+        "vehicles": "Vehicles & EV charging",
+        "servers": "Servers & self-hosting",
+        "leisure": "Leisure, sport & games"
       }
     },
     "externalIntegration": {
-      "updateAvailable": "Update available",
       "deviceTab": "Devices",
       "discoverTab": "Discover",
       "configTab": "Configuration",
@@ -1090,7 +1175,18 @@
         "openRawLink": "Open in a new tab"
       },
       "config": {
+        "aiProviderActive": "This integration is the AI provider of the assistant: the conversations with the assistant are sent to it.",
+        "aiProviderInactive": "This integration is installed but the assistant does not use it yet: select it as the AI provider of the instance to route the chat, the scene “Ask AI” actions and the weekly digest through it instead of Gladys Plus.",
+        "aiProviderUseButton": "Use as AI provider",
+        "aiProviderSettingsLink": "Open the AI settings",
+        "aiProviderError": "Unable to change the AI provider of the instance. Please try again.",
+        "aiProviderLoadError": "Unable to read the AI provider of the instance.",
+        "aiProviderChecking": "Checking whether this integration is the AI provider of the assistant…",
         "title": "Configuration",
+        "ttsVoiceActive": "This integration is the voice of your instance: scene announcements and voice assistant replies speak through it.",
+        "ttsVoiceActiveNotRunning": "This integration is the voice of your instance, but it is not running: scene announcements and voice assistant replies will fail until it is restarted.",
+        "ttsVoiceInactive": "This integration is not the voice of your instance (the active voice is \"{{name}}\"). Installing it is not enough: select it as the voice to use it.",
+        "ttsVoiceChangeLink": "Change the voice of the instance",
         "docsLink": "Documentation",
         "loadError": "There was an error loading the configuration.",
         "noConfig": "This integration has no configuration options.",
@@ -1169,6 +1265,9 @@
         "uninstallWarning": "Are you sure you want to uninstall this integration? Its container and configuration will be removed. Devices created by this integration will stay in Gladys until you delete them.",
         "uninstallCalendarWarning": "Are you sure you want to uninstall this integration? Its container and configuration will be removed, and the calendars it created will be deleted, with their events, for every user of the household — not only yours.",
         "uninstallEnergyWarning": "This integration prices energy contracts itself: the contracts it prices will stop being priced once it is uninstalled (their existing costs are kept).",
+        "uninstallAiProviderWarning": "This integration is the AI provider of the assistant: once uninstalled, the assistant switches back to Gladys Plus (or stops answering until a provider is available, without Gladys Plus).",
+        "uninstallAiProviderUnknownWarning": "Gladys could not check whether this integration is the AI provider of the assistant: if it is, the assistant switches back to Gladys Plus once it is uninstalled (or stops answering until a provider is available, without Gladys Plus).",
+        "uninstallAiProviderCheckingWarning": "Checking whether this integration is the AI provider of the assistant…",
         "confirmUninstallButton": "Yes, uninstall",
         "cancelUninstallButton": "Cancel",
         "startedAtLabel": "Running since"
@@ -1254,6 +1353,7 @@
       },
       "install": {
         "notFound": "This integration was not found in the store.",
+        "loadError": "This integration could not be loaded from the store. Check the internet connection of your Gladys and try again.",
         "starsLabel": "stars",
         "lastPushLabel": "Last update:",
         "warningTitle": "Community integration",
@@ -1278,6 +1378,8 @@
         "notificationWarningText": "This integration is a notification channel: it will be able to send you messages, but it can never receive messages nor act on your behalf (server-side guarantee).",
         "weatherInfoText": "This integration is a weather provider: once installed, it will provide the weather displayed in Gladys (dashboard widget and assistant).",
         "calendarInfoText": "This integration is a calendar provider: once installed, it will create calendars and events in Gladys for the users who enable it with their own account.",
+        "ttsInfoText": "This integration is a text-to-speech provider: once installed, select it as the voice of your instance in the Artificial Intelligence integration. Announcements are served on your local network — speakers and browsers on the same network can play them.",
+        "ttsInfoLink": "Open the Artificial Intelligence integration",
         "widgetsTitle": "Dashboard widgets",
         "widgetsText": "This integration provides the following widgets, available to every user in the dashboard editor:",
         "energyContractsTitle": "Energy contracts",
@@ -1287,6 +1389,7 @@
         "energyContractsDelegatedText": "A template priced by the integration computes your energy costs itself: the costs of these contracts are only computed while the integration is running, and stop being computed if it is uninstalled.",
         "providerInfoText": "This integration manages no device: it provides dashboard widgets. Configure it here, then add its widgets from the dashboard editor.",
         "providerEnergyInfoText": "This integration manages no device: it provides energy contract templates and tariff calendars. Configure it here, then pick its contracts from the energy monitoring page.",
+        "aiWarningText": "This integration is an AI provider: if an administrator selects it as the AI provider of the instance (Integrations → Artificial Intelligence → AI provider, or the button on this integration's configuration screen), it will receive all the assistant conversations (messages, history, device states returned by tools, chat images), and its answers will drive the assistant's actions on your home.",
         "sceneDeclarationsTitle": "Scene triggers and actions",
         "sceneDeclarationsText": "This integration adds {{triggers}} trigger(s) and {{actions}} action(s) to the scene editor.",
         "sceneTriggerPrefix": "Trigger:",
@@ -1961,6 +2064,7 @@
         "usagePointName": "Meter",
         "lastRefresh": "Latest data :",
         "usagePointId": "Meter ID",
+        "usagePointDeviceName": "Name",
         "contractType": "Contract type",
         "contracts": {
           "hc-hp": "Off-peak/peak hours",
@@ -3320,6 +3424,7 @@
       "documentation": "AI documentation",
       "description": "Give Gladys the power of artificial intelligence.",
       "firstExplanation": "Gladys can use artificial intelligence (open-weight AI models via Gladys Plus) to help you communicate with your connected home.",
+      "firstExplanationExternalProvider": "Gladys uses artificial intelligence to help you communicate with your connected home. On this instance, the assistant goes through the AI provider integration “{{name}}” selected by an administrator, instead of Gladys Plus: the conversations with the assistant are sent to it.",
       "examplesIntro": "Here's what you can do with AI:",
       "examplesChatTitle": "In the Gladys chat",
       "examplesChatHint": "Available actions: lights and switches by room, cameras, scenes, temperature, humidity and the weather.",
@@ -3351,6 +3456,20 @@
         "downloadButton": "Download JSON context for debug",
         "error": "Unable to generate debug context. Make sure the MCP service is running."
       },
+      "aiProvider": {
+        "activeNotice": "The assistant currently uses the AI provider “{{name}}”: the conversations with the assistant are sent to it.",
+        "title": "AI provider",
+        "description": "Gladys uses Gladys Plus as its AI provider by default. You can route the assistant (chat, intent routing, scene \"Ask AI\" actions, weekly digest) through an installed AI provider integration instead: Claude, DeepSeek, OpenAI, a local model... The provider's own settings (API key, model) are on its integration page.",
+        "selectLabel": "Provider used for AI requests",
+        "gladysPlusOption": "Gladys Plus (default)",
+        "trustWarning": "All the assistant conversations (messages, history, device states returned by tools, chat images) are sent to this provider, and its answers drive the assistant's actions on your home. If the provider is down, AI requests fail: they are never rerouted to Gladys Plus.",
+        "noProvider": "No AI provider integration installed. Install one from the integrations catalog to use another provider than Gladys Plus.",
+        "loadError": "Unable to load the AI provider settings.",
+        "retry": "Retry",
+        "saveError": "Unable to save the AI provider. Please try again.",
+        "providerNotRunning": "This AI provider integration is not running: AI requests will fail until it is started.",
+        "providerNotRunningLink": "Open the integration page"
+      },
       "weeklyDigest": {
         "title": "Weekly home digest",
         "description": "Gladys sends you a weekly summary of your connected home: comfort, energy, maintenance, and useful tips.",
@@ -3370,7 +3489,19 @@
       },
       "rateLimit": "As the AI API is not free, this integration is limited to 3,000 text requests and 500 image requests per month per account.",
       "notOnGladysPlus": "As the AI API is not free, this integration is only available to Gladys Plus users.",
-      "subscribeToGladysPlus": "<a href=\"https://gladysassistant.com/plus/\"  target=\"_blank\" rel=\"noopener noreferrer\">Click here</a> to subscribe to Gladys Plus."
+      "subscribeToGladysPlus": "<a href=\"https://gladysassistant.com/plus/\"  target=\"_blank\" rel=\"noopener noreferrer\">Click here</a> to subscribe to Gladys Plus.",
+      "ttsProvider": "Voice (text-to-speech provider)",
+      "ttsProviderText": "The provider used to speak: scene announcements on your speakers and the voice assistant replies. Gladys Plus works everywhere (including remote access); a TTS provider integration generates the voice locally, served on your local network.",
+      "ttsProviderSelectLabel": "Provider used to speak",
+      "ttsProviderPlusNotConnected": "Gladys Plus is not connected: announcements and voice replies will not play.",
+      "ttsProviderPlusSettingsLink": "Connect Gladys Plus",
+      "ttsProviderPlusNotConnectedOr": "or install a text-to-speech integration and select it here:",
+      "ttsProviderNotRunning": "\"{{name}}\" is not running: announcements and voice replies will fail until it is started again.",
+      "ttsProviderUnavailable": "The selected provider \"{{provider}}\" is no longer available: select another voice.",
+      "ttsProviderUnavailableOption": "{{provider}} (no longer available)",
+      "ttsProviderInstallHint": "Only Gladys Plus is available. A text-to-speech integration from the catalog can generate the voice locally, without a subscription.",
+      "ttsProviderOpenIntegration": "Open the integration",
+      "ttsProviderBrowseCatalog": "Browse the voice assistant integrations"
     },
     "callmebot": {
       "title": "CallMeBot",
@@ -3793,6 +3924,7 @@
       },
       "askAi": {
         "description": "This action will send a message to the AI via Gladys Plus and will reply to you with a message. If you attach a camera image, the AI will be able to see what is on the image and even take action accordingly.",
+        "descriptionExternalProvider": "This action will send a message to the AI provider “{{name}}” selected in the AI settings and will reply to you with a message. If you attach a camera image, the AI will be able to see what is on the image and even take action accordingly.",
         "userLabel": "Gladys will respond to",
         "cameraLabel": "Attach a camera image (optional)",
         "textLabel": "My question for the AI",
@@ -4040,8 +4172,22 @@
         "variablesExplanation": "To inject a variable in the text, press '{{'. To set a variable value, you need to use a 'Set a variable' or 'Get device value' box before this one.",
         "messagePlaceholder": "My message"
       },
+      "playMedia": {
+        "description": "This action will start the selected media on the selected player.",
+        "deviceLabel": "Player",
+        "mediaLabel": "Media to play",
+        "selectedMedia": "Selected",
+        "changeMedia": "Change",
+        "noMedia": "No media selected yet: browse or search the catalog of the player below.",
+        "unsupported": "This player exposes no catalog: pick another player.",
+        "modeLabel": "Mode",
+        "modeReplace": "Play now (replaces the current playback)",
+        "modeNext": "Play next",
+        "modeAppend": "Add to the end of the queue"
+      },
       "playNotification": {
         "description": "This action will make Gladys speak on the selected speaker.",
+        "voiceSettingLink": "Choose the voice of your instance (Artificial Intelligence integration)",
         "deviceLabel": "Speaker",
         "volumeLabel": "Volume",
         "valueTypeSimple": "Simple",
@@ -4138,7 +4284,8 @@
         "send": "Send Zigbee2mqtt Message"
       },
       "music": {
-        "play-notification": "Talk on a speaker"
+        "play-notification": "Talk on a speaker",
+        "play-media": "Play music on a speaker"
       },
       "ai": {
         "ask": "Ask AI"
@@ -4180,7 +4327,8 @@
         "send": "Send a text message to a phone"
       },
       "music": {
-        "play-notification": "Read a text out loud on a speaker"
+        "play-notification": "Read a text out loud on a speaker",
+        "play-media": "Start a track, an album, a playlist or a radio on a speaker"
       },
       "condition": {
         "if-then-else": "Follow a different path depending on a condition",
@@ -4578,6 +4726,7 @@
     "userRole": "User",
     "adminRole": "Administrator",
     "roleDescription": "An admin has all rights in the Gladys instance. A user can just edit his dashboard, talk to Gladys, see his calendars & map. He cannot create scenes, edit preferences or modify an integration configuration.",
+    "ownRoleLocked": "You cannot change your own role. Another administrator can do it for you.",
     "invitationPending": "Pending",
     "invitationSuccess": "Accepted",
     "firstnameLabel": "First Name",
@@ -5251,6 +5400,8 @@
     },
     "tts": {
       "title": "This action requires Gladys Plus",
+      "providerTitle": "This action needs a voice",
+      "providerCompactDescription": "Gladys Plus gives Gladys a natural voice that works everywhere, including remote access. Without a subscription, you can also install a text-to-speech integration and select it as the voice of your instance.",
       "description": "The \"Play on a speaker\" action uses Text-to-Speech APIs via Gladys Plus to make Gladys talk on your speakers (Sonos, Google Cast, etc.) with a natural voice.",
       "compactDescription": "This action uses the Text-to-Speech APIs via Gladys Plus.",
       "feature1": "Natural, multilingual voices",
@@ -5709,6 +5860,13 @@
           "mop": "Mop"
         }
       },
+      "music": {
+        "repeat": {
+          "off": "Off",
+          "all": "All",
+          "one": "One track"
+        }
+      },
       "water-heater": {
         "mode": {
           "off": "Off",
@@ -6016,7 +6174,14 @@
       "music": {
         "playback_state": {
           "0": "Paused",
-          "1": "Playing"
+          "1": "Playing",
+          "2": "Stopped",
+          "3": "Buffering"
+        },
+        "repeat": {
+          "0": "Off",
+          "1": "All",
+          "2": "One track"
         }
       },
       "opening-sensor": {
@@ -6801,7 +6966,16 @@
       "previous": "Music previous button",
       "next": "Music next button",
       "playback_state": "Music playback state",
-      "play_notification": "Broadcast a notification"
+      "play_notification": "Broadcast a notification",
+      "title": "Track title",
+      "artist": "Artist",
+      "album": "Album",
+      "artwork": "Artwork",
+      "duration": "Track duration",
+      "position": "Playback position",
+      "shuffle": "Shuffle",
+      "repeat": "Repeat mode",
+      "mute": "Mute"
     },
     "lock": {
       "shortCategoryName": "Lock",

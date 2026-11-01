@@ -46,6 +46,7 @@ import SetAlarmMode from './actions/SetAlarmMode';
 import SendMqttMessage from './actions/SendMqttMessage';
 import SendZigbee2MqttMessage from './actions/SendZigbee2MqttMessage';
 import PlayNotification from './actions/PlayNotification';
+import PlayMedia from './actions/PlayMedia';
 import EdfTempoCondition from './actions/EdfTempoCondition';
 import EnergyCurrentPriceCondition from './actions/EnergyCurrentPriceCondition';
 import AskAI from './actions/AskAI';
@@ -90,6 +91,7 @@ const ACTION_COMPONENTS = {
   [ACTIONS.MQTT.SEND]: SendMqttMessage,
   [ACTIONS.ZIGBEE2MQTT.SEND]: SendZigbee2MqttMessage,
   [ACTIONS.MUSIC.PLAY_NOTIFICATION]: PlayNotification,
+  [ACTIONS.MUSIC.PLAY_MEDIA]: PlayMedia,
   [ACTIONS.AI.ASK]: AskAI,
   [ACTIONS.SMS.SEND]: SendSms,
   [ACTIONS.CONDITION.IF_THEN_ELSE]: ConditionIfElseThen,
@@ -168,7 +170,10 @@ const ActionCard = ({ children, ...props }) => {
     props.action.type === ACTIONS.DEVICE.SET_VALUE
   );
   const summary = !isExpanded
-    ? getActionSummary(props.action, props.intl.dictionary, { user: props.user, units: featureUnits })
+    ? getActionSummary(props.action, props.intl.dictionary, props.deviceFeatures, {
+        user: props.user,
+        units: featureUnits
+      })
     : null;
   // an action declared by an external integration is titled by its manifest
   // label; an orphan one (uninstalled, key removed) keeps the generic label
@@ -281,7 +286,8 @@ const ActionCard = ({ children, ...props }) => {
               moveCard: props.moveCard,
               moveCardGroup: props.moveCardGroup,
               scene: props.scene,
-              sceneIntegrations: props.sceneIntegrations
+              sceneIntegrations: props.sceneIntegrations,
+              deviceFeatures: props.deviceFeatures
             };
 
             return <Component {...commonProps} />;

@@ -301,12 +301,12 @@ const trig = (feature, value) => ({ type: 'device.new-state', device_feature: fe
 const act = (feature, extra) => ({ type: 'device.set-value', device_feature: feature, ...extra });
 assert.strictEqual(sum.getTriggerSummary(trig('f-c', 22.3), {}, fCtx), 'f-c · >= 72 °F');
 assert.strictEqual(sum.getTriggerSummary(trig('f-f', 70.5), {}, fCtx), 'f-f · >= 71 °F');
-assert.strictEqual(sum.getActionSummary(act('f-c', { value: 23.5 }), {}, fCtx), 'f-c · 74 °F');
-assert.strictEqual(sum.getActionSummary(act('f-c', { evaluate_value: '{{x}}' }), {}, fCtx), 'f-c · {{x}}');
+assert.strictEqual(sum.getActionSummary(act('f-c', { value: 23.5 }), {}, null, fCtx), 'f-c · 74 °F');
+assert.strictEqual(sum.getActionSummary(act('f-c', { evaluate_value: '{{x}}' }), {}, null, fCtx), 'f-c · {{x}}');
 // no change for a Celsius user, units not loaded yet, a non-temperature feature
 [undefined, { user: cUser, units: fCtx.units }, { user: fUser, units: null }].forEach(ctx => {
   assert.strictEqual(sum.getTriggerSummary(trig('f-c', 22.3), {}, ctx), 'f-c · >= 22.3');
-  assert.strictEqual(sum.getActionSummary(act('f-c', { value: 23.5 }), {}, ctx), 'f-c · 23.5');
+  assert.strictEqual(sum.getActionSummary(act('f-c', { value: 23.5 }), {}, null, ctx), 'f-c · 23.5');
 });
 assert.strictEqual(sum.getTriggerSummary(trig('f-pct', 40), {}, fCtx), 'f-pct · >= 40');
 // Typed text (a Fahrenheit user's editors): partial text is never a number, a comma is a decimal point

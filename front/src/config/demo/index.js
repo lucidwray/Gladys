@@ -10,7 +10,7 @@ import { powerFixtures } from './power';
 import { demoLanguage, uuid, hoursAgo, minutesAgo, solarPowerNow } from './helpers';
 import integrations from './integrations';
 import { translate } from './i18n';
-import { getStoreCatalog, refreshStoreCatalog, getStoreDocs } from './store';
+import { getStoreCatalog, getStoreIntegration, refreshStoreCatalog, getStoreDocs } from './store';
 import system from './system';
 
 /**
@@ -185,11 +185,9 @@ const installFromStore = async ({ store_slug: storeSlug }) => {
   if (installedBySlug[storeSlug]) {
     return installedBySlug[storeSlug];
   }
-  const { integrations: catalog } = await getStoreCatalog({}, installedBySlug);
-  const entry = catalog.find(candidate => candidate.store_slug === storeSlug);
-  if (!entry) {
-    throw new Error(`${storeSlug} is not in the store index`);
-  }
+  // the complete manifest (configuration screen, widgets...), not the lite
+  // one of the catalog
+  const entry = await getStoreIntegration({ store_slug: storeSlug }, installedBySlug);
   const version = entry.manifest.version || '1.0.0';
   const integration = {
     id: uuid(`external-${storeSlug}`),
@@ -527,6 +525,7 @@ const home = {
   // stale-catalog warning instead of claiming a fresh one
   'post /api/v1/external_integration/store/refresh': () => refreshStoreCatalog(installedBySlug),
   'get /api/v1/external_integration/store/docs': query => getStoreDocs(query),
+  'get /api/v1/external_integration/store/integration': query => getStoreIntegration(query, installedBySlug),
   'post /api/v1/external_integration': body => installFromStore(body),
   // Hardware access classes offered by the install screen of an integration
   // that asks for one: what a normal Linux host reports.

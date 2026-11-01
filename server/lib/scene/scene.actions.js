@@ -389,12 +389,18 @@ const actionsFunc = {
       // Read by message.reply, never sent to the chat API.
       service: action.service || null,
     };
-    const { answer } = await self.gateway.forwardMessageToAiChat({
+    const result = await self.gateway.forwardMessageToAiChat({
       message,
       image,
       context: {},
     });
-    set(scope, path, { answer }, { merge: true });
+    // the chat loop resolves null when the request failed (provider down or
+    // timed out, no usable answer): the user already got the failure reply,
+    // the scene stops here with an explicit reason instead of a TypeError
+    if (result === null) {
+      throw new AbortScene('AI_REQUEST_FAILED');
+    }
+    set(scope, path, { answer: result.answer }, { merge: true });
   },
   [ACTIONS.DEVICE.GET_VALUE]: async (self, action, scope, path) => {
     const deviceFeature = self.stateManager.get('deviceFeature', action.device_feature);
@@ -996,10 +1002,17 @@ const actionsFunc = {
       volume = Math.min(100, Math.max(0, Math.round(volume)));
     }
 
-    // Get TTS URL
-    const { url } = await self.gateway.getTTSApiUrl({ text: messageWithVariables });
+    // Get the TTS URL from the active provider (Gladys Plus by default, or
+    // any TTS provider integration — see gladys.tts)
+    const { url } = await self.tts.getSpeechUrl({ text: messageWithVariables });
     // Play TTS Notification on device
     await self.device.setValue(device, deviceFeature, url, { volume });
+  },
+  [ACTIONS.MUSIC.PLAY_MEDIA]: async (self, action) => {
+    // the media id is opaque to the core and flows back to the integration that
+    // produced it (capabilities/music.md, section 7); a stopped or refusing
+    // integration makes the action throw, the scene framework logs it
+    await self.device.music.play(action.device, action.media, action.mode);
   },
   [ACTIONS.SMS.SEND]: async (self, action, scope) => {
     const freeMobileService = self.service.getService('free-mobile');

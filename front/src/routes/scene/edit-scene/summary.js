@@ -3,6 +3,8 @@ import get from 'get-value';
 import { ACTIONS, EVENTS } from '../../../../../server/utils/constants';
 import { isWildcardValue } from './sceneIntegrations';
 import { getUserTemperatureDisplay } from '../../../utils/hawrayTemperature';
+import getDeviceFeatureValueOptions from '../../../utils/deviceFeatureValueOptions';
+import { getDeviceFeatureName } from '../../../utils/device';
 
 const truncate = (text, maxLength = 60) => {
   if (typeof text !== 'string') {
@@ -53,10 +55,19 @@ const listSelectors = selectors => {
   return truncate(selectors.join(', '));
 };
 
+// The device name of a feature selector once the devices are loaded, the raw
+// selector until then (or if the feature was deleted)
+const getFeatureLabel = (selector, dictionary, deviceFeatures) => {
+  const { device, feature } = (deviceFeatures && deviceFeatures[selector]) || {};
+  return truncate(device ? getDeviceFeatureName(dictionary, device, feature) : selector);
+};
+
 // Builds a short human-readable summary of a configured action, displayed when
 // its card is collapsed. Returns null when there is nothing meaningful to show:
-// the card then only displays the action type label.
-const getActionSummary = (action, dictionary, temperature) => {
+// the card then only displays the action type label. deviceFeatures maps a
+// feature selector to its { device, feature }, null while loading. temperature
+// ({ user, units }) makes the temperature values read in whole degrees Fahrenheit.
+const getActionSummary = (action, dictionary, deviceFeatures, temperature) => {
   if (!action || !action.type) {
     return null;
   }
@@ -78,6 +89,8 @@ const getActionSummary = (action, dictionary, temperature) => {
       return joinParts([action.user, truncate(action.text)]);
     case ACTIONS.MUSIC.PLAY_NOTIFICATION:
       return truncate(action.text);
+    case ACTIONS.MUSIC.PLAY_MEDIA:
+      return joinParts([action.device, action.media ? truncate(action.media.title || action.media.id) : null]);
     case ACTIONS.MQTT.SEND:
     case ACTIONS.ZIGBEE2MQTT.SEND:
       return truncate(action.topic);
@@ -100,20 +113,28 @@ const getActionSummary = (action, dictionary, temperature) => {
     case ACTIONS.USER.CHECK_PRESENCE:
       return joinParts([action.user, action.house]);
     case ACTIONS.DEVICE.GET_VALUE:
-      return truncate(action.device_feature);
+      return getFeatureLabel(action.device_feature, dictionary, deviceFeatures);
     case ACTIONS.DEVICE.SET_VALUE: {
-      const value =
-        action.evaluate_value !== undefined && action.evaluate_value !== null && action.evaluate_value !== ''
-          ? action.evaluate_value
-          : action.value;
-      const isFormula =
+      const hasEvaluateValue =
         action.evaluate_value !== undefined && action.evaluate_value !== null && action.evaluate_value !== '';
-      const temperatureText = isFormula
+      const value = hasEvaluateValue ? action.evaluate_value : action.value;
+      // Until the devices are loaded (or if the feature was deleted), the raw selector and value are shown
+      const { feature } = (deviceFeatures && deviceFeatures[action.device_feature]) || {};
+      const temperatureText = hasEvaluateValue
         ? null
         : formatTemperatureValue(value, action.device_feature, temperature, dictionary);
+      let valueLabel = value !== undefined && value !== null && value !== '' ? String(value) : null;
+      if (feature && valueLabel !== null && !hasEvaluateValue) {
+        const valueOption = (getDeviceFeatureValueOptions(dictionary, feature) || []).find(
+          option => `${option.value}` === valueLabel
+        );
+        if (valueOption) {
+          valueLabel = valueOption.label;
+        }
+      }
       return joinParts([
-        truncate(action.device_feature),
-        temperatureText || (value !== undefined && value !== null && value !== '' ? truncate(String(value), 20) : null)
+        getFeatureLabel(action.device_feature, dictionary, deviceFeatures),
+        temperatureText || (valueLabel !== null ? truncate(valueLabel, 20) : null)
       ]);
     }
     case ACTIONS.LIGHT.TURN_ON:
